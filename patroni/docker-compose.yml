@@ -1,0 +1,156 @@
+
+services:
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.12
+    container_name: patroni_etcd
+    environment:
+      ETCD_NAME: etcd
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
+      ETCD_LISTEN_PEER_URLS: http://0.0.0.0:2380
+      ETCD_INITIAL_ADVERTISE_PEER_URLS: http://etcd:2380
+      ETCD_INITIAL_CLUSTER: etcd=http://etcd:2380
+      ETCD_INITIAL_CLUSTER_STATE: new
+      ETCD_INITIAL_CLUSTER_TOKEN: patroni-cluster
+    networks:
+      - patroni_network
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+
+  patroni1:
+    image: patroni:latest
+    container_name: patroni_node1
+    build:
+      context: ./docker/patroni
+      dockerfile: Dockerfile
+    environment:
+      PATRONI_NAME: patroni1
+      PATRONI_SCOPE: postgres-cluster
+      PATRONI_ETCD3_HOSTS: etcd:2379
+      PATRONI_RESTAPI_CONNECT_ADDRESS: patroni1:8008
+      PATRONI_RESTAPI_LISTEN: 0.0.0.0:8008
+      PATRONI_POSTGRESQL_CONNECT_ADDRESS: patroni1:5432
+      PATRONI_POSTGRESQL_LISTEN: 0.0.0.0:5432
+      PATRONI_POSTGRESQL_DATA_DIR: /var/lib/postgresql/data
+      PATRONI_REPLICATION_USERNAME: replicator
+      PATRONI_REPLICATION_PASSWORD: rep-pass
+      PATRONI_SUPERUSER_USERNAME: postgres
+      PATRONI_SUPERUSER_PASSWORD: postgres
+    networks:
+      - patroni_network
+    ports:
+      - "15432:5432"
+      - "8008:8008"
+    volumes:
+      - ./patroni1_data:/var/lib/postgresql/data
+      - ./docker/patroni/patroni.yml:/etc/patroni/patroni.yml
+      - ./docker/patroni/pgbouncer_control.sh:/opt/scripts/pgbouncer_control.sh
+      - ./docker/pgbouncer/__pgbouncer.ini:/opt/scripts/__pgbouncer.ini
+      - ./docker/pgbouncer/userlist.txt:/opt/scripts/userlist.txt
+      - ./pgbouncer_conf:/etc/pgbouncer/
+    depends_on:
+      - etcd
+
+
+  patroni2:
+    image: patroni:latest
+    container_name: patroni_node2
+    build:
+      context: ./docker/patroni
+      dockerfile: Dockerfile
+    environment:
+      PATRONI_NAME: patroni2
+      PATRONI_SCOPE: postgres-cluster
+      PATRONI_ETCD3_HOSTS: etcd:2379
+      PATRONI_RESTAPI_CONNECT_ADDRESS: patroni2:8008
+      PATRONI_RESTAPI_LISTEN: 0.0.0.0:8008
+      PATRONI_POSTGRESQL_CONNECT_ADDRESS: patroni2:5432
+      PATRONI_POSTGRESQL_LISTEN: 0.0.0.0:5432
+      PATRONI_POSTGRESQL_DATA_DIR: /var/lib/postgresql/data
+      PATRONI_REPLICATION_USERNAME: replicator
+      PATRONI_REPLICATION_PASSWORD: rep-pass
+      PATRONI_SUPERUSER_USERNAME: postgres
+      PATRONI_SUPERUSER_PASSWORD: postgres
+    networks:
+      - patroni_network
+    ports:
+      - "15433:5432"
+      - "8009:8008"
+    volumes:
+      - ./patroni2_data:/var/lib/postgresql/data
+      - ./docker/patroni/patroni.yml:/etc/patroni/patroni.yml
+      - ./docker/patroni/pgbouncer_control.sh:/opt/scripts/pgbouncer_control.sh
+      - ./docker/pgbouncer/__pgbouncer.ini:/opt/scripts/__pgbouncer.ini
+      - ./docker/pgbouncer/userlist.txt:/opt/scripts/userlist.txt
+      - ./pgbouncer_conf:/etc/pgbouncer/
+    depends_on:
+      - etcd
+
+  # This service waits until Patroni is up and responding on the REST API before continuing.
+  patroni-wait:
+    image: curlimages/curl:8.8.0
+    depends_on:
+      - patroni1
+      - patroni2
+    networks:
+      - patroni_network
+    entrypoint:
+      - sh
+      - -c
+      - |
+        for i in $(seq 1 30); do
+          echo "Waiting for Patroni REST API at patroni1:8008/health...";
+          if curl -sf patroni1:8008/health | grep -q '"state": *"running"'; then
+            echo "Patroni1 is up.";
+            exit 0;
+          fi
+          sleep 2
+        done
+        echo "Patroni1 did not start in time." >&2
+        exit 1
+
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: pgbouncer
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@patroni1:5432/postgres
+      POOL_MODE: session
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 25
+    networks:
+      - patroni_network
+    ports:
+      - "6432:5432"
+    volumes:
+      - ./pgbouncer_conf:/etc/pgbouncer/
+      - ./docker/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    depends_on:
+      - patroni1
+      - patroni2
+      - patroni-wait
+
+
+  haproxy:
+    image: haproxy:2.9-alpine
+    container_name: patroni_haproxy
+    networks:
+      - patroni_network
+    ports:
+      - "5432:5432"
+      - "7001:7001"
+    volumes:
+      - ./docker/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - pgbouncer
+
+networks:
+  patroni_network:
+    driver: bridge
+
+volumes:
+  patroni1_data:
+  patroni2_data:
+  pgbouncer_conf:
+
