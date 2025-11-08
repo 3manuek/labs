@@ -1,0 +1,4 @@
+./patroni*data
+pgbouncer_conf/
+TODO.md
+./docker/pgbouncer/pgbouncer.ini
