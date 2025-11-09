@@ -1,0 +1,10 @@
+all:
+  vars:
+    postgres_user: "node_user"
+    postgres_password: "password"
+    postgres_db: "postgres"
+    shard_prefix: "shard_"
+    shard_factor: 3               # How many shards per node by default
+    shard_modulus: 9                    # How many total shards
+    postgres_expose_port_ix: 16000
+    pgcat_expose_port_ix: 15432

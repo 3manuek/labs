@@ -1,0 +1,18 @@
+{% for shard in range(nodeix | int, shard_modulus, shard_factor) %}
+CREATE DATABASE {{ shard_prefix }}{{ shard }};
+{% endfor %}
+
+{% for shard in range(nodeix | int, shard_modulus, shard_factor) %}
+
+\c {{ shard_prefix }}{{ shard }}
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TABLE IF NOT EXISTS users (
+    username BIGINT PRIMARY KEY, 
+    email TEXT NOT NULL
+) PARTITION BY HASH (username);
+
+CREATE TABLE users_{{ shard }}_v1 PARTITION OF users FOR VALUES WITH (MODULUS {{ shard_modulus }}, REMAINDER {{ shard }});
+
+{% endfor %}

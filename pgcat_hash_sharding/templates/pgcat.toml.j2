@@ -1,0 +1,48 @@
+# https://github.com/postgresml/pgcat/blob/main/CONFIG.md
+[general]
+log_level = "info"
+port = 5432
+host = "0.0.0.0"
+
+admin_username = "{{ postgres_user }}"
+admin_password = "{{ postgres_password }}"
+
+# https://github.com/postgresml/pgcat/blob/main/CONFIG.md?plain=1#L149
+autoreload = 10000
+
+[pools.direct]
+pool_mode = "session"
+
+[pools.direct.users.0]
+username = "{{ postgres_user }}"
+password = "{{ postgres_password }}"
+pool_size = 10
+
+{% for i in nodes.results %}
+[pools.direct.shards.{{ i.item }}]
+servers = [["{{ i.stdout }}", 5432, "primary"]]
+database = "{{ postgres_db }}"
+{% endfor %}
+
+
+[pools.shardpool]
+pool_mode = "transaction"
+sharding_function = "pg_bigint_hash"
+# load_balancing_mode = "random"
+# query_parser_enabled = true # looks like is also needed for sharding?
+# query_parser_read_write_splitting = true
+# default_shard = "shard0"
+
+[pools.shardpool.users.0]
+username = "{{ postgres_user }}"
+password = "{{ postgres_password }}"
+pool_size = 10
+pool_mode = "transaction"
+
+{% for i in nodes.results %}
+{% for shard in range(i.item, shard_modulus, shard_factor) %}
+[pools.shardpool.shards.{{ shard }}]
+servers = [["{{ i.stdout }}", 5432, "primary"]]
+database = "{{ shard_prefix }}{{ shard }}"
+{% endfor %}
+{% endfor %}

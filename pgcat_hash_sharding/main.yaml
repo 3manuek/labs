@@ -1,0 +1,144 @@
+
+- name: Clean containers
+  hosts: localhost
+  ignore_errors: true
+  tasks:
+    - name: Clean containers
+      community.docker.docker_container:
+        name: "node_{{ item }}"
+        force_kill: true
+        state: absent
+      loop: "{{ range(0, shard_factor | int) | list }}"
+
+    - name: Clean containers
+      community.docker.docker_container:
+        name: "pgcat"
+        state: absent
+        force_kill: true
+
+    - name: Clean networks
+      community.docker.docker_network:
+        name: "{{ item }}"
+        state: absent
+      loop: ["front-net", "back-net"]
+  tags: [clean]
+
+
+- name: Deploy PostgreSQL and PgCat with Docker
+  hosts: localhost
+  tasks:
+    - name: Register list of nodes 
+      ansible.builtin.shell: "echo node_{{ item }}"
+      loop: "{{ range(0, shard_factor | int) | list }}"
+      register: nodes
+
+    - name: Register list of shards 
+      ansible.builtin.shell: "echo shard_{{ item }}"
+      loop: "{{ range(0, shard_modulus | int) | list }}"
+      register: shards
+
+    - name: Ensure .conf dir exists
+      ansible.builtin.file:
+        path: .conf
+        state: directory
+
+    - name: Render PgCat Config
+      ansible.builtin.template:
+        src: pgcat.toml.j2
+        dest: .conf/pgcat.toml
+
+    - name: Render Init SQLs
+      ansible.builtin.template:
+        src: init.sql.j2
+        dest: .conf/init_{{ item.stdout }}.sql
+      loop: "{{ nodes.results }}"
+      vars:
+        nodeix: "{{ item.item | int }}"
+
+    # Create Docker Networks
+    - name: Create front-net network
+      community.docker.docker_network:
+        name: front-net
+
+    - name: Create back-net network
+      community.docker.docker_network:
+        name: back-net
+
+    # Deploy PostgreSQL Node
+    - name: Run PostgreSQL Node Container
+      community.docker.docker_container:
+        name: "{{ item.stdout }}"
+        image: postgres:17
+        restart_policy: unless-stopped
+        env:
+          POSTGRES_USER: "{{ postgres_user }}"
+          POSTGRES_PASSWORD: "{{ postgres_password }}"
+          POSTGRES_DB: "{{ postgres_db }}"
+        ports:
+          - "16000-16100:5432" # In Production, we shouldn't expose, all connections should 
+                               # go through pool. See the direct pool configuration in pgcat.toml
+        networks:
+          - name: back-net
+        labels:
+          com.docker.scaled.kind: node
+        volumes:
+          - ".conf/init_{{ item.stdout }}.sql:/docker-entrypoint-initdb.d/init.sql"
+        command: >
+          postgres  -c wal_level=logical
+                    -c max_replication_slots=4
+                    -c max_wal_senders=4
+                    -c listen_addresses='*'
+                    -c hot_standby_feedback=on
+                    -c sync_replication_slots=true
+      loop: "{{ nodes.results }}"
+
+    # Deploy PgCat (Connection Pooler)
+    - name: Run PgCat Container
+      community.docker.docker_container:
+        name: pgcat
+        image: ghcr.io/postgresml/pgcat:latest
+        restart_policy: unless-stopped
+        ports:
+          - "15432:5432"
+        volumes:
+          - ".conf/pgcat.toml:/etc/pgcat/pgcat.toml"
+        labels:
+          com.docker.scaled.kind: pgcat
+        networks:
+          - name: back-net
+
+  tags: [create]
+
+- name: Run pgbench container 
+  hosts: localhost
+  tasks:
+    - name: Build docker container for pgbench
+      community.docker.docker_image_build:
+        name: pgbench
+        path: ./docker/pgbench
+        dockerfile: Dockerfile 
+        tag: latest
+        # nocache: true
+        rebuild: "always"
+    
+    - name: Execute benchmark
+      community.docker.docker_container:
+        name: pgbench 
+        image: pgbench:latest
+        state: started
+        detach: false
+        user: "postgres"
+        env:
+          PGPASSWORD: "{{ postgres_password }}"
+        networks:
+          - name: back-net
+        labels:
+          com.docker.scaled.kind: pgbench
+        volumes:
+          - "./pgbench-shard.sql:/home/postgres/pgbench-shard.sql"
+        command: >
+          -h pgcat -c 10 -U {{ postgres_user }} -d shardpool -f /home/postgres/pgbench-shard.sql 
+      register: pgbench_results
+
+    - debug: msg="{{ pgbench_results.container.Output | regex_findall('.*tps.*') }}"
+  tags: [pgbench]
