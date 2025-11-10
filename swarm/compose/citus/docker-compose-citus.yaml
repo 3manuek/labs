@@ -1,0 +1,59 @@
+networks:
+  default:
+    driver: overlay
+
+services:
+  coordinator:
+    image: citusdata/citus:latest
+    environment:
+      - POSTGRES_PASSWORD=mysecretpassword
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=mydb
+    ports:
+      - "5432:5432"  # Expose coordinator on the host
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    # Ensure the Citus extension is preloaded.
+    command: >
+      sh -c "docker-entrypoint.sh postgres -c shared_preload_libraries=citus"
+
+  worker1:
+    image: citusdata/citus:latest
+    environment:
+      - POSTGRES_PASSWORD=mysecretpassword
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=mydb
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    command: >
+      sh -c "docker-entrypoint.sh postgres -c shared_preload_libraries=citus"
+
+  worker2:
+    image: citusdata/citus:latest
+    environment:
+      - POSTGRES_PASSWORD=mysecretpassword
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=mydb
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    command: >
+      sh -c "docker-entrypoint.sh postgres -c shared_preload_libraries=citus"
+

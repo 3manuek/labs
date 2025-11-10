@@ -1,0 +1,284 @@
+# version: "3.8"
+
+# Define an overlay network for swarm services
+networks:
+  swarmlab_net:
+    driver: overlay
+    external: true
+    attachable: true
+  # bnet:
+  #   driver: bridge
+volumes:
+  etcd-data1:
+  etcd-data2:
+  etcd-data3:
+
+# YAML anchors to avoid duplication (optional)
+x-etcd-env: &etcd_env
+  ETCD_LISTEN_PEER_URLS: "http://0.0.0.0:2380"
+  ETCD_LISTEN_CLIENT_URLS: "http://0.0.0.0:2379"
+  ETCD_INITIAL_CLUSTER: "etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380"
+  # ETCD_INITIAL_CLUSTER: "etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcdinit=http://etcdinit:2380"
+  
+  ETCD_INITIAL_CLUSTER_STATE: "new"
+  ETCD_INITIAL_CLUSTER_TOKEN: "swarmlab"
+  # ETCD_INITIAL_ADVERTISE_PEER_URLS: "http://etcd.1:2380"
+  ETCD_UNSUPPORTED_ARCH: "arm64"
+
+x-haproxy-env: &haproxy_env
+  ETCDCTL_ENDPOINTS: "http://etcd1:2379,http://etcd2:2379,http://etcd3:2379"
+  # ETCD_HOST: "http://etcd1:2379,http://etcd2:2379,http://etcd3:2379"
+  # ETCD_HOSTS: "'etcd1:2379','etcd2:2379','etcd3:2379'"
+  ETCD_HOST: "swarmlab_etcd:2379"
+  # PATRONI_ETCD3_HOSTS: "etcd1:2379,etcd2:2379,etcd3:2379"
+  # ETCD_HOST: "etcd1:2379,etcd2:2379,etcd3:2379"
+  PATRONI_SCOPE: "swarmlab"
+  SCOPE: "swarmlab"
+  PATRONI_CITUS_GROUP: "0"
+  PATRONI_CITUS_DATABASE: "citus"
+  PGSSLMODE: "verify-ca"
+  PGSSLKEY: "/etc/ssl/private/ssl-cert-snakeoil.key"
+  PGSSLCERT: "/etc/ssl/certs/ssl-cert-snakeoil.pem"
+  PGSSLROOTCERT: "/etc/ssl/certs/ssl-cert-snakeoil.pem"
+  SPILO_CONFIGURATION: |
+    bootstrap:
+      dcs:
+        ttl: 30
+        loop_wait: 10
+        retry_timeout: 10
+        maximum_lag_on_failover: 1048576
+      pg_hba:
+        - host all all 0.0.0.0/0 md5
+      initdb:
+        - encoding: UTF8
+        - data-checksums
+        - locale: en_US.UTF-8
+    postgresql:
+      use_pg_rewind: true
+      parameters:
+        max_connections: 200
+        shared_buffers: 256MB
+        wal_level: logical
+
+services:
+  # registry:
+  #   image: registry:2
+  #   networks:
+  #     - swarmlab_net
+  #     - bnet
+  #   ports:
+  #     - "5005:5005"
+  #   deploy:
+  #     placement:
+  #       constraints:
+  #         - "node.hostname == ip-172-31-25-244"
+
+  # etcdinit:
+  #   image: ${PATRONI_TEST_IMAGE:-patroni-citus}
+  #   networks:
+  #     - swarmlab_net
+  #   environment:
+  #     <<: *etcd_env
+  #   hostname: etcdinit
+  #   command: >
+  #     sh -c 'export ETCD_UNSUPPORTED_ARCH=$$(dpkg --print-architecture) && 
+  #       exec etcd -name $${HOSTNAME} -listen-peer-urls $${ETCD_LISTEN_PEER_URLS} --initial-advertise-peer-urls http://$${HOSTNAME}:2380 -advertise-client-urls http://$${HOSTNAME}:2379 '
+  #   deploy:
+  #     placement:
+  #       constraints:
+  #         - "node.role == manager"
+  #     endpoint_mode: dnsrr
+
+
+  # etcd:
+  #   image: ${PATRONI_TEST_IMAGE:-patroni-citus}
+  #   # container_name: etcd{{.Task.Slot}}
+  #   networks:
+  #     - swarmlab_net
+  #     # - bnet
+  #   environment:
+  #     <<: *etcd_env
+  #   # hostname: "{{.Service.Name}}.{{.Task.Slot}}"
+  #   hostname: "etcd{{.Task.Slot}}"
+  #   # command: >
+  #   #   etcd --name "${hostname}" --initial-advertise-peer-urls http://${hostname}:2380
+  #   command: >
+  #     sh -c 'export ETCD_UNSUPPORTED_ARCH=$$(dpkg --print-architecture) && 
+  #       exec etcd -name $${HOSTNAME} -listen-peer-urls $${ETCD_LISTEN_PEER_URLS} --initial-advertise-peer-urls http://$${HOSTNAME}:2380 -advertise-client-urls http://$${HOSTNAME}:2379 '
+  #   # --initial-advertise-peer-urls $${ETCD_INITIAL_ADVERTISE_PEER_URLS}  -listen-client-urls $${ETCD_LISTEN_CLIENT_URLS} -advertise-client-urls http://$$(hostname --ip-address):2379
+  #   # deploy:
+  #   #   restart_policy:
+  #   #     condition: any
+  #   #   # https://docs.docker.com/reference/compose-file/deploy/#mode
+  #   #   mode: global # Task.Slot in global is the node id, not the index https://github.com/docker/for-linux/issues/1378#issuecomment-1199034275
+  #   # ports:
+  #   #   # - target: 2379
+  #   #   #   published: 2379
+  #   #   #   mode: host
+  #   #   # - target: 2380
+  #   #   #   published: 2380
+  #   #   #   mode: host
+  #   #   # - "2379:2379"
+  #   #   # - "2380:2380"
+  #   #   - "2379"
+  #   #   - "2380"
+  #   deploy:
+  #     mode: replicated
+  #     replicas: 3
+  #     endpoint_mode: dnsrr # vip 
+  #     # endpoint_mode: vip # services do not connect directly, so vip cant be
+
+  etcd:
+    image: "quay.io/coreos/etcd:v3.5.19"
+    networks:
+      swarmlab_net:
+        aliases:
+          - "etcd{{.Task.Slot}}" 
+    environment:
+      ETCD_NAME: "etcd{{.Task.Slot}}"
+      ETCD_LISTEN_PEER_URLS: "http://0.0.0.0:2380"
+      ETCD_LISTEN_CLIENT_URLS: "http://0.0.0.0:2379"
+      ETCD_INITIAL_CLUSTER: "etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380"
+      ETCD_INITIAL_CLUSTER_STATE: "new"
+      ETCD_INITIAL_CLUSTER_TOKEN: "swarmlab"
+      ETCD_ADVERTISE_CLIENT_URLS: "http://etcd{{.Task.Slot}}:2379"
+      ETCD_INITIAL_ADVERTISE_PEER_URLS: "http://etcd{{.Task.Slot}}:2380"
+    hostname: "etcd{{.Task.Slot}}"
+    # ports:
+    #   - "2379:2379"
+    #   - "2380:2380"
+    deploy:
+      mode: replicated
+      replicas: 3
+      endpoint_mode: dnsrr
+    # volumes:
+    #   - etcd-data{{.Task.Slot}}:/etcd-data
+
+  # etcd:
+  #     image: ${SPILO_TEST_IMAGE:-spilo}
+  #     networks:
+  #       - swarmlab_net
+  #     container_name: etcd
+  #     hostname: etcd
+  #     command: "sh -c 'export ETCD_UNSUPPORTED_ARCH=$$(dpkg --print-architecture) && exec etcd -name etcd1 -listen-client-urls http://0.0.0.0:2379 -advertise-client-urls http://$$(hostname --ip-address):2379'"
+
+
+  # haproxy:
+  #   image: ${PATRONI_TEST_IMAGE:-patroni-citus}
+  #   networks:
+  #     - swarmlab_net
+  #     # - bnet
+  #   env_file:
+  #     - docker/patroni.env
+  #   hostname: haproxy
+  #   ports:
+  #     - "5000:5000"  # Access to the coordinator primary
+  #     - "5001:5001"  # Load-balancing across worker primaries
+  #   command: haproxy
+  #   environment:
+  #     <<: *haproxy_env
+  #   deploy:
+  #     restart_policy:
+  #       condition: any
+  #     mode: global
+
+  coord:
+    image: ${PATRONI_TEST_IMAGE:-patroni-citus}
+    networks:
+      - swarmlab_net
+      # - bnet
+    env_file:
+      - docker/patroni.env
+    hostname: coord{{.Task.Slot}}
+    environment:
+      <<: *haproxy_env
+      PATRONI_NAME: "coord{{.Task.Slot}}"
+    deploy:
+      mode: replicated
+      replicas: 3
+      endpoint_mode: dnsrr
+    # deploy:
+    #   restart_policy:
+    #     condition: any
+    #   mode: global
+      # placement:
+      #   spread:
+      #     - node.id
+
+  # coord1:
+  #   image: ${PATRONI_TEST_IMAGE:-patroni-citus}
+  #   networks:
+  #     - swarmlab_net
+  #   env_file:
+  #     - docker/patroni.env
+  #   hostname: coord1
+  #   environment:
+  #     <<: *haproxy_env
+  #     PATRONI_NAME: "coord1"
+  #   deploy:
+  #     restart_policy:
+  #       condition: any
+
+  work1-1:
+    image: ${PATRONI_TEST_IMAGE:-patroni-citus}
+    networks:
+      - swarmlab_net
+      # - bnet
+    env_file:
+      - docker/patroni.env
+    hostname: work1-1
+    environment:
+      <<: *haproxy_env
+      PATRONI_NAME: "work1-1"
+      PATRONI_CITUS_GROUP: "1"
+    deploy:
+      restart_policy:
+        condition: any
+
+  work1-2:
+    image: ${PATRONI_TEST_IMAGE:-patroni-citus}
+    networks:
+      - swarmlab_net
+      # - bnet
+    env_file:
+      - docker/patroni.env
+    hostname: work1-2
+    environment:
+      <<: *haproxy_env
+      PATRONI_NAME: "work1-2"
+      PATRONI_CITUS_GROUP: "1"
+    deploy:
+      restart_policy:
+        condition: any
+
+  work2-1:
+    image: ${PATRONI_TEST_IMAGE:-patroni-citus}
+    networks:
+      - swarmlab_net
+      # - bnet
+    env_file:
+      - docker/patroni.env
+    hostname: work2-1
+    environment:
+      <<: *haproxy_env
+      PATRONI_NAME: "work2-1"
+      PATRONI_CITUS_GROUP: "2"
+    deploy:
+      restart_policy:
+        condition: any
+
+  work2-2:
+    image: ${PATRONI_TEST_IMAGE:-patroni-citus}
+    networks:
+      - swarmlab_net
+      # - bnet
+    env_file:
+      - docker/patroni.env
+    hostname: work2-2
+    environment:
+      <<: *haproxy_env
+      PATRONI_NAME: "work2-2"
+      PATRONI_CITUS_GROUP: "2"
+    deploy:
+      restart_policy:
+        condition: any

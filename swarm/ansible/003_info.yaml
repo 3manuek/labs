@@ -1,0 +1,16 @@
+- name: Get Swarm info
+  hosts: all
+  become: true
+  tasks:
+    - name: Check if node is already in swarm
+      ansible.builtin.shell: docker info --format '{{ "{{" }}.Swarm{{ "}}" }}'
+      register: swarm_state
+      # changed_when: false
+      retries: 3
+      delay: 5
+      # until: swarm_state.rc == 0
+      ignore_errors: yes
+
+    - name: Display swarm state
+      ansible.builtin.debug:
+        var: swarm_state.stdout

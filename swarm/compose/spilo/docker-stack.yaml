@@ -1,0 +1,229 @@
+version: '3.8'
+
+# Define networks that span across nodes
+networks:
+  postgres_network:
+    driver: overlay
+    attachable: true
+
+# Define volumes that will persist the data
+volumes:
+  etcd1_data:
+  etcd2_data:
+  etcd3_data:
+  postgres1_data:
+  postgres2_data:
+  postgres3_data:
+
+services:
+  # ETCD Cluster (3 nodes)
+  etcd1:
+    image: quay.io/coreos/etcd:v3.5.5
+    command:
+      - etcd
+      - --name=etcd1
+      - --data-dir=/etcd_data
+      - --initial-advertise-peer-urls=http://etcd1:2380
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://etcd1:2379
+      - --initial-cluster=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=etcd-cluster-token
+    volumes:
+      - etcd1_data:/etcd_data
+    networks:
+      - postgres_network
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == node1
+
+  etcd2:
+    image: quay.io/coreos/etcd:v3.5.5
+    command:
+      - etcd
+      - --name=etcd2
+      - --data-dir=/etcd_data
+      - --initial-advertise-peer-urls=http://etcd2:2380
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://etcd2:2379
+      - --initial-cluster=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=etcd-cluster-token
+    volumes:
+      - etcd2_data:/etcd_data
+    networks:
+      - postgres_network
+    ports:
+      - "2381:2379"
+      - "2382:2380"
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == node2
+
+  etcd3:
+    image: quay.io/coreos/etcd:v3.5.5
+    command:
+      - etcd
+      - --name=etcd3
+      - --data-dir=/etcd_data
+      - --initial-advertise-peer-urls=http://etcd3:2380
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://etcd3:2379
+      - --initial-cluster=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=etcd-cluster-token
+    volumes:
+      - etcd3_data:/etcd_data
+    networks:
+      - postgres_network
+    ports:
+      - "2383:2379"
+      - "2384:2380"
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == node3
+
+  # Spilo/Patroni PostgreSQL Cluster (3 nodes)
+  postgres1:
+    image: registry.opensource.zalan.do/acid/spilo-14:3.0-p1
+    environment:
+      SCOPE: postgres-cluster
+      PGVERSION: "14"
+      ETCD_HOST: etcd1:2379,etcd2:2379,etcd3:2379
+      SPILO_CONFIGURATION: |
+        bootstrap:
+          dcs:
+            ttl: 30
+            loop_wait: 10
+            retry_timeout: 10
+            maximum_lag_on_failover: 1048576
+          pg_hba:
+            - host all all 0.0.0.0/0 md5
+          initdb:
+            - encoding: UTF8
+            - data-checksums
+            - locale: en_US.UTF-8
+        postgresql:
+          use_pg_rewind: true
+          parameters:
+            max_connections: 200
+            shared_buffers: 256MB
+            wal_level: logical
+      PGUSER_SUPERUSER: postgres
+      PGPASSWORD_SUPERUSER: supersecret
+      PGUSER_ADMIN: admin
+      PGPASSWORD_ADMIN: adminsecret
+      PGUSER_STANDBY: standby
+      PGPASSWORD_STANDBY: standbysecret
+      KUBERNETES_NAMESPACE: default
+      KUBERNETES_ROLE_NAME: patroni
+      POD_IP: postgres1
+    volumes:
+      - postgres1_data:/home/postgres/pgdata
+    networks:
+      - postgres_network
+    ports:
+      - "5432:5432"
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == node1
+
+  postgres2:
+    image: registry.opensource.zalan.do/acid/spilo-14:3.0-p1
+    environment:
+      SCOPE: postgres-cluster
+      PGVERSION: "14"
+      ETCD_HOST: etcd1:2379,etcd2:2379,etcd3:2379
+      SPILO_CONFIGURATION: |
+        bootstrap:
+          dcs:
+            ttl: 30
+            loop_wait: 10
+            retry_timeout: 10
+            maximum_lag_on_failover: 1048576
+          pg_hba:
+            - host all all 0.0.0.0/0 md5
+          initdb:
+            - encoding: UTF8
+            - data-checksums
+            - locale: en_US.UTF-8
+        postgresql:
+          use_pg_rewind: true
+          parameters:
+            max_connections: 200
+            shared_buffers: 256MB
+            wal_level: logical
+      PGUSER_SUPERUSER: postgres
+      PGPASSWORD_SUPERUSER: supersecret
+      PGUSER_ADMIN: admin
+      PGPASSWORD_ADMIN: adminsecret
+      PGUSER_STANDBY: standby
+      PGPASSWORD_STANDBY: standbysecret
+      KUBERNETES_NAMESPACE: default
+      KUBERNETES_ROLE_NAME: patroni
+      POD_IP: postgres2
+    volumes:
+      - postgres2_data:/home/postgres/pgdata
+    networks:
+      - postgres_network
+    ports:
+      - "5433:5432"
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == node2
+
+  postgres3:
+    image: registry.opensource.zalan.do/acid/spilo-14:3.0-p1
+    environment:
+      SCOPE: postgres-cluster
+      PGVERSION: "14"
+      ETCD_HOST: etcd1:2379,etcd2:2379,etcd3:2379
+      SPILO_CONFIGURATION: |
+        bootstrap:
+          dcs:
+            ttl: 30
+            loop_wait: 10
+            retry_timeout: 10
+            maximum_lag_on_failover: 1048576
+          pg_hba:
+            - host all all 0.0.0.0/0 md5
+          initdb:
+            - encoding: UTF8
+            - data-checksums
+            - locale: en_US.UTF-8
+        postgresql:
+          use_pg_rewind: true
+          parameters:
+            max_connections: 200
+            shared_buffers: 256MB
+            wal_level: logical
+      PGUSER_SUPERUSER: postgres
+      PGPASSWORD_SUPERUSER: supersecret
+      PGUSER_ADMIN: admin
+      PGPASSWORD_ADMIN: adminsecret
+      PGUSER_STANDBY: standby
+      PGPASSWORD_STANDBY: standbysecret
+      KUBERNETES_NAMESPACE: default
+      KUBERNETES_ROLE_NAME: patroni
+      POD_IP: postgres3
+    volumes:
+      - postgres3_data:/home/postgres/pgdata
+    networks:
+      - postgres_network
+    ports:
+      - "5434:5432"
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == node3

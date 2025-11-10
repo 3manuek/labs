@@ -1,0 +1,58 @@
+---
+- name: Copy spilo stack files
+  hosts: all
+  tasks:
+    - name: Copy folder to hosts
+      ansible.builtin.copy:
+        src: './spilo-ha'
+        remote_src: false
+        dest: './' # home ubuntu
+        mode: '0755'
+  # become: true 
+  tags: [copy]
+
+- name: Remove stack 
+  hosts: node1
+  tasks:
+    - name: Remove stack
+      ansible.builtin.shell: docker stack rm {{ docker_stack }}
+      environment: 
+        SPILO_TEST_IMAGE: "{{ registry_url }}/{{spilo_image}}:latest"
+    # - name: Wait stack to clean
+    #   ansible.builtin.wait_for:
+    #     timeout: 10
+    #     delay: 1
+    #     state: gone
+  tags: [remove]
+
+# Spawn docker stack
+- name: Spawn docker stack
+  hosts: node1
+  # become: true
+  tasks:
+    - name: Spawn docker stack
+      ansible.builtin.shell: docker stack deploy -c docker-compose-spilo.yaml {{ docker_stack }}
+      args:
+        chdir: ./spilo-ha
+      environment: 
+        # SPILO_TEST_IMAGE: "node1:5000/{{patroni_image}}:{{patroni_version}}"
+        SPILO_TEST_IMAGE: "{{ registry_url }}/{{spilo_image}}:latest"
+
+    - name: Wait 10 seconds for stack to start
+      ansible.builtin.pause:
+        seconds: 10
+
+    - name: Force update haproxy service
+      ansible.builtin.shell: docker service update --force swarmlab_haproxy
+      args:
+        chdir: ./spilo-ha
+  tags: [deploy]
+
+- name: Get config rendered
+  hosts: node1
+  tasks:
+    - name: Get config rendered
+      ansible.builtin.shell: docker stack config --compose-file docker-compose-spilo.yaml
+      args:
+        chdir: ./spilo-ha
+  tags: [deploy]

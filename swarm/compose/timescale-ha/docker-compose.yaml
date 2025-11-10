@@ -1,0 +1,58 @@
+
+services:
+  etcd:
+    image: quay.io/coreos/etcd:latest
+    hostname: "{{.Node.Hostname}}"
+    environment:
+      # Set a unique name for each etcd instance using the node hostname.
+      - ETCD_NAME={{.Node.Hostname}}
+      # Use a persistent data directory.
+      - ETCD_DATA_DIR=/etcd-data
+      # Listen on all interfaces for client requests.
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      # Advertise the client URL using the node hostname.
+      - ETCD_ADVERTISE_CLIENT_URLS=http://{{.Node.Hostname}}:2379
+      # Peer communication settings.
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://{{.Node.Hostname}}:2380
+      # Specify the initial cluster configuration.
+      - ETCD_INITIAL_CLUSTER=node1=http://node1:2380,node2=http://node2:2380,node3=http://node3:2380
+      - ETCD_INITIAL_CLUSTER_STATE=new
+    networks:
+      - timescaledb_net
+    # volumes:
+    #   - etcd_data:/etcd-data
+    deploy:
+      mode: global
+      endpoint_mode: dnsrr
+
+  timescaledb:
+    image: timescale/timescaledb-docker-ha:latest
+    environment:
+      - POSTGRES_USER=youruser
+      - POSTGRES_PASSWORD=yourpassword
+      - POSTGRES_DB=yourdb
+      # Patroni settings:
+      - PATRONI_SCOPE=timescaledb
+      - PATRONI_NAMESPACE=/service/
+      - PATRONI_NAME={{.Task.Slot}}
+      # Point Patroni to the etcd cluster endpoints.
+      - PATRONI_ETCD_HOST=http://node1:2379,http://node2:2379,http://node3:2379
+    networks:
+      - timescaledb_net
+    deploy:
+      mode: replicated
+      replicas: 3
+      placement:
+        constraints:
+          - node.role == worker
+    # volumes:
+    #   - timescaledb_data:/var/lib/postgresql/data
+
+networks:
+  timescaledb_net:
+    external: true
+
+# volumes:
+#   etcd_data:
+#   timescaledb_data:

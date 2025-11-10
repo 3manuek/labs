@@ -1,0 +1,35 @@
+---
+# Build image in node1 
+- name: Git checkout
+  hosts: node1
+  tasks:
+    - name: Git checkout
+      ansible.builtin.git:
+        repo: 'https://github.com/zalando/spilo.git'
+        dest: ./images/{{spilo_image}}
+        # version: "{{ patroni_version }}"
+        # version: "3.0-p1"
+        ssh_opts: "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+
+    - name: Build image
+      ansible.builtin.shell: docker build -t {{ spilo_image }} .
+      args:
+        chdir: ./images/{{spilo_image}}/postgres-appliance
+
+    # - name: Remove service
+    #   # --constraint 'node.hostname == ip-172-31-25-244'
+    #   ansible.builtin.shell: docker service rm  registry
+    #   ignore_errors: true
+
+    # - name: Regstry service
+    #   # --constraint 'node.hostname == ip-172-31-25-244'
+    #   ansible.builtin.shell: docker service create --name registry --network swarmlab_net --network bridge --publish 5005:5005 registry:2
+    #   ignore_errors: true
+
+    - name: tag image 
+      ansible.builtin.shell: docker tag {{ spilo_image }} {{ registry_url }}/{{ spilo_image }}:latest #{{ patroni_version }}
+
+    - name: Push image
+      ansible.builtin.shell: docker push {{ registry_url }}/{{ spilo_image }}:latest #{{ patroni_version }}
+
+  tags: [build]

@@ -1,0 +1,29 @@
+networks:
+  # front:
+  back:
+
+services:
+  # Shard 1
+  swarmlab_api_db:
+    #image: postgres:17.2
+    image: timescale/timescaledb:latest-pg17
+    container_name: swarmlab_api_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: swarmlab_api
+    ports:
+      - "15432:5432"
+    volumes:
+      # - postgres_data_shard_1:/var/lib/postgresql/data
+      - ./entrypoint:/docker-entrypoint-initdb.d
+    networks:
+      - back
+    command: >
+      postgres  -c wal_level=logical
+                -c max_replication_slots=4
+                -c max_wal_senders=4
+                -c listen_addresses='*'
+                -c hot_standby_feedback=on
+                -c sync_replication_slots=true
+                -c shared_preload_libraries='timescaledb'

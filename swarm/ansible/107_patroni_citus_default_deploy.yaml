@@ -1,0 +1,49 @@
+---
+- name: Copy patroni-citus stack files
+  hosts: all
+  tasks:
+    - name: Copy folder to hosts
+      ansible.builtin.copy:
+        src: './{{ patroni_citus_image }}-default'
+        remote_src: false
+        dest: './' # home ubuntu
+        mode: '0755'
+  # become: true 
+  tags: [copy]
+
+- name: Remove stack 
+  hosts: node1
+  tasks:
+    - name: Remove stack
+      ansible.builtin.shell: docker stack rm {{ docker_stack }}
+      environment: 
+        PATRONI_TEST_IMAGE: "{{ registry_url }}/{{ patroni_citus_image }}"
+    # - name: Wait stack to clean
+    #   ansible.builtin.wait_for:
+    #     timeout: 10
+    #     delay: 1
+    #     state: gone
+  tags: [remove]
+
+# Spawn docker stack
+- name: Spawn docker stack
+  hosts: node1
+  # become: true
+  tasks:
+    - name: Spawn docker stack
+      ansible.builtin.shell: docker stack deploy -c docker-compose.yaml {{ docker_stack }}
+      args:
+        chdir: ./{{ patroni_citus_image }}-default
+      environment: 
+        # PATRONI_TEST_IMAGE: "node1:5000/{{patroni_image}}:{{patroni_version}}"
+        PATRONI_TEST_IMAGE: "{{ registry_url }}/{{ patroni_citus_image }}"
+    
+    - name: Wait 10 seconds for stack to start
+      ansible.builtin.pause:
+        seconds: 10
+
+    - name: Force update haproxy service
+      ansible.builtin.shell: docker service update --force swarmlab_haproxy
+      # args:
+      #   chdir: ./{{ patroni_citus_image }}
+  tags: [deploy]

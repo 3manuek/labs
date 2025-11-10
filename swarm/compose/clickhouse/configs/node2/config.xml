@@ -1,0 +1,53 @@
+<yandex>
+    <!-- Logging settings -->
+    <logger>
+        <level>trace</level>
+        <log>/var/log/clickhouse-server/clickhouse-server.log</log>
+        <errorlog>/var/log/clickhouse-server/clickhouse-server.err.log</errorlog>
+    </logger>
+
+    <!-- Ports -->
+    <http_port>8123</http_port>
+    <tcp_port>9000</tcp_port>
+
+    <!-- Listen on the specific hostname assigned to Node 2 -->
+    <listen_host>clickhouse-node2</listen_host>
+
+    <!-- Distributed DDL configuration using etcd -->
+    <distributed_ddl>
+        <path>/clickhouse/task_queue</path>
+        <node>etcd-node1:2379</node>
+        <node>etcd-node2:2379</node>
+        <node>etcd-node3:2379</node>
+    </distributed_ddl>
+
+    <!-- Cluster definition for distributed queries -->
+    <remote_servers>
+        <my_cluster>
+            <shard>
+                <replica>
+                    <host>clickhouse-node1</host>
+                    <port>9000</port>
+                </replica>
+                <replica>
+                    <host>clickhouse-node2</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+            <shard>
+                <replica>
+                    <host>clickhouse-node3</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+        </my_cluster>
+    </remote_servers>
+
+    <!-- Macros to use in table engines -->
+    <macros>
+        <replica>node2</replica>
+        <shard>shard1</shard>
+    </macros>
+
+    <!-- Other settings can be added here as needed -->
+</yandex>

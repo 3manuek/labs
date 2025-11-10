@@ -1,0 +1,7 @@
+- name: leave swarm 
+  hosts: all
+  tasks:
+    - name: leave 
+      ansible.builtin.shell: docker swarm leave -f 
+      ignore_errors: yes 
+  tags: [leave]

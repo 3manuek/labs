@@ -1,0 +1,220 @@
+---
+- name: Install Docker on all nodes
+  hosts: all
+  become: true
+  tasks:
+    - name: Update apt cache and install prerequisites
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - python3-pip
+          - python3-docker
+          - pipenv
+          - net-tools
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker GPG key
+      ansible.builtin.apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker repository
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+      when: ansible_os_family == "Debian"
+
+
+    - name: Install Docker CE
+      ansible.builtin.apt:
+        name: docker-ce
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Add ubuntu user to docker group
+      ansible.builtin.user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+    - name: Start and enable Docker service
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+  tags: [install]
+
+- name: Docker Login 
+  hosts: all
+  tasks:
+    - name: Docker login 
+      ansible.builtin.shell: echo {{ docker_login_token }} | docker login -u {{ docker_login_user }} --password-stdin 
+  tags: [init, login]
+
+
+- name: Initialize Docker Swarm on manager (node1)
+  hosts: node1
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Restart Docker service
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
+        daemon_reload: yes
+
+    - name: Wait for Docker to be ready
+      ansible.builtin.wait_for:
+        timeout: 30
+
+    - name: Check if node is already in swarm
+      ansible.builtin.shell: docker info --format '{{ "{{" }}.Swarm.LocalNodeState{{ "}}" }}'
+      register: swarm_state
+      changed_when: false
+      retries: 3
+      delay: 5
+      until: swarm_state.rc == 0
+      ignore_errors: yes
+
+    - name: Leave swarm if in error state
+      ansible.builtin.shell: docker swarm leave --force
+      when: swarm_state.stdout == "error" or "'DeadlineExceeded' in swarm_state.stderr"
+      ignore_errors: yes
+
+    - name: Get the internal IP for using this as the advertise address 
+      ansible.builtin.set_fact:
+        advertise_addr: "{{ hostvars['node1']['ansible_default_ipv4']['address'] }}"
+          
+    - name: Initialize the Docker Swarm through advertise address {{ advertise_addr }}
+      ansible.builtin.shell: docker swarm init --advertise-addr {{ advertise_addr }} # --data-path-addr (need another interface) 
+      register: swarm_init
+      changed_when: "'Swarm initialized' in swarm_init.stdout or swarm_init.rc == 0"
+      ignore_errors: yes
+  tags: [init]
+
+- name: Join worker nodes to the Swarm
+  hosts: node2:node3
+  gather_facts: true
+  tasks:
+    - name: Get the worker join token
+      ansible.builtin.shell: docker swarm join-token -q worker
+      delegate_to: node1
+      register: worker_token
+
+    - name: Get the internal IP for using this as the advertise address 
+      ansible.builtin.set_fact:
+        advertise_addr: "{{ hostvars['node1']['ansible_default_ipv4']['address'] }}"
+      delegate_to: localhost
+
+    - name: Set join token fact for workers
+      ansible.builtin.set_fact:
+        swarm_worker_token: "{{ worker_token.stdout }}"
+      delegate_to: localhost
+
+    - name: Restart Docker service
+      become: true
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
+        daemon_reload: yes
+
+    - name: Wait for Docker to be ready
+      ansible.builtin.wait_for:
+        timeout: 30
+
+    - name: Check if node is already in swarm
+      ansible.builtin.shell: docker info --format '{{ "{{" }}.Swarm.LocalNodeState{{ "}}" }}'
+      register: swarm_state
+      changed_when: false
+      retries: 3
+      delay: 5
+      until: swarm_state.rc == 0
+      ignore_errors: yes
+
+    - name: Leave swarm if in error state
+      ansible.builtin.shell: docker swarm leave --force
+      when: swarm_state.stdout == "error" or "'DeadlineExceeded' in swarm_state.stderr"
+      ignore_errors: yes
+
+    - name: Join the swarm as worker - master={{ advertise_addr }}   
+      ansible.builtin.shell: >
+        docker swarm join --token {{ swarm_worker_token }} \
+          --advertise-addr {{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }} {{ advertise_addr }}:2377
+      register: join_result
+      changed_when: "'This node joined' in join_result.stdout or join_result.rc == 0"
+      ignore_errors: yes
+
+    - name: Wait for node to join the swarm
+      ansible.builtin.shell: |
+        docker info --format {{ '"{{' }}.Swarm.LocalNodeState{{ '}}"' }}
+      register: swarm_status
+      until: swarm_status.stdout == "active"
+      retries: 5
+      delay: 3
+      ignore_errors: yes
+  tags: [join]
+
+- name: Overlay Network 
+  hosts: node1
+  tasks:
+    - name: Drop {{ overlay_network }} Network 
+      ansible.builtin.shell: docker network rm {{ overlay_network }}
+      ignore_errors: yes
+
+    - name: Create an overlay network for internal container communication
+      ansible.builtin.shell: docker network create --scope swarm --driver overlay --attachable {{ overlay_network }}
+      # rpc error: code = InvalidArgument desc = ingress network cannot be attachable"
+      # --ingress
+      ignore_errors: yes
+  tags: [network]
+
+# XXX: currently using a public image, this might not be needed
+- name: Enable insecure registries
+  hosts: all
+  tasks:
+    # FIXME: we  should use docker swarm for enabling this or at least templates
+    - name: Enable insecure registries
+      become: true
+      ansible.builtin.copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "insecure-registries": ["node1:5005"]
+          }
+    - name: Restart Docker service
+      become: true
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
+        daemon_reload: yes
+  tags: [registry]
+
+- name: Update /etc/hosts with internal IPs
+  hosts: all
+  become: true
+  gather_facts: true  # Ensure facts (including IP) are collected
+  tasks:
+    - name: Generate hosts file content
+      ansible.builtin.set_fact:
+        hosts_entries: |
+          {% for host in groups['all'] %}
+          {{ hostvars[host]['ansible_default_ipv4']['address'] }} {{ host }}
+          {% endfor %}
+
+    - name: Ensure /etc/hosts contains correct entries
+      ansible.builtin.blockinfile:
+        path: /etc/hosts
+        marker: "# BEGIN ANSIBLE MANAGED BLOCK - DO NOT EDIT"
+        marker_end: "# END ANSIBLE MANAGED BLOCK"
+        block: "{{ hosts_entries }}"
+        create: true
+        state: present
+  tags: [hosts]

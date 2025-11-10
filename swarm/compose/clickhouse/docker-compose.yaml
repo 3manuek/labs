@@ -1,0 +1,134 @@
+services:
+  # --- ETCD Cluster Services ---
+  etcd-node1:
+    image: bitnami/etcd:latest
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_NAME=etcd-node1
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd-node1:2379
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_INITIAL_CLUSTER=etcd-node1=http://etcd-node1:2380,etcd-node2=http://etcd-node2:2380,etcd-node3=http://etcd-node3:2380
+      - ETCD_INITIAL_CLUSTER_STATE=new
+      - ETCD_INITIAL_CLUSTER_TOKEN=etcd-cluster-1
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+    ports:
+      - target: 2379
+        published: 2379
+        protocol: tcp
+      - target: 2380
+        published: 2380
+        protocol: tcp
+    deploy:
+      placement:
+        constraints:
+          - node.labels.etcd == etcd-node1
+
+  etcd-node2:
+    image: bitnami/etcd:latest
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_NAME=etcd-node2
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd-node2:2379
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_INITIAL_CLUSTER=etcd-node1=http://etcd-node1:2380,etcd-node2=http://etcd-node2:2380,etcd-node3=http://etcd-node3:2380
+      - ETCD_INITIAL_CLUSTER_STATE=new
+      - ETCD_INITIAL_CLUSTER_TOKEN=etcd-cluster-1
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+    ports:
+      - target: 2379
+        published: 2379
+        protocol: tcp
+      - target: 2380
+        published: 2380
+        protocol: tcp
+    deploy:
+      placement:
+        constraints:
+          - node.labels.etcd == etcd-node2
+
+  etcd-node3:
+    image: bitnami/etcd:latest
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_NAME=etcd-node3
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd-node3:2379
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_INITIAL_CLUSTER=etcd-node1=http://etcd-node1:2380,etcd-node2=http://etcd-node2:2380,etcd-node3=http://etcd-node3:2380
+      - ETCD_INITIAL_CLUSTER_STATE=new
+      - ETCD_INITIAL_CLUSTER_TOKEN=etcd-cluster-1
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+    ports:
+      - target: 2379
+        published: 2379
+        protocol: tcp
+      - target: 2380
+        published: 2380
+        protocol: tcp
+    deploy:
+      placement:
+        constraints:
+          - node.labels.etcd == etcd-node3
+
+  # --- ClickHouse Cluster Services ---
+  clickhouse-node1:
+    image: clickhouse/clickhouse-server:latest
+    ports:
+      - target: 8123  # HTTP interface
+        published: 8123
+        protocol: tcp
+      - target: 9000  # Native TCP interface
+        published: 9000
+        protocol: tcp
+    volumes:
+      - ./configs/node1/config.xml:/etc/clickhouse-server/config.xml:ro
+      - ./configs/node1/users.xml:/etc/clickhouse-server/users.xml:ro
+    # Example environment variable to pass etcd endpoints.
+    # In your config.xml, ensure you reference these endpoints (or hard-code them).
+    environment:
+      CLICKHOUSE_ETCD_NODES: "etcd-node1:2379,etcd-node2:2379,etcd-node3:2379"
+    deploy:
+      placement:
+        constraints:
+          - node.labels.clickhouse == clickhouse-node1
+
+  clickhouse-node2:
+    image: clickhouse/clickhouse-server:latest
+    ports:
+      - target: 8123
+        published: 8124
+        protocol: tcp
+      - target: 9000
+        published: 9001
+        protocol: tcp
+    volumes:
+      - ./configs/node2/config.xml:/etc/clickhouse-server/config.xml:ro
+      - ./configs/node2/users.xml:/etc/clickhouse-server/users.xml:ro
+    environment:
+      CLICKHOUSE_ETCD_NODES: "etcd-node1:2379,etcd-node2:2379,etcd-node3:2379"
+    deploy:
+      placement:
+        constraints:
+          - node.labels.clickhouse == clickhouse-node2
+
+  clickhouse-node3:
+    image: clickhouse/clickhouse-server:latest
+    ports:
+      - target: 8123
+        published: 8125
+        protocol: tcp
+      - target: 9000
+        published: 9002
+        protocol: tcp
+    volumes:
+      - ./configs/node3/config.xml:/etc/clickhouse-server/config.xml:ro
+      - ./configs/node3/users.xml:/etc/clickhouse-server/users.xml:ro
+    environment:
+      CLICKHOUSE_ETCD_NODES: "etcd-node1:2379,etcd-node2:2379,etcd-node3:2379"
+    deploy:
+      placement:
+        constraints:
+          - node.labels.clickhouse == clickhouse-node3
+
+networks:
+  default:
+    name: clickhouse_cluster_net
