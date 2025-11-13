@@ -4,15 +4,6 @@
 
 This lab demonstrates the use of logical replication in PostgreSQL.
 
-## Architecture
-
-```mermaid
-graph TB
-    A[PostgreSQL 13] --> B[PostgreSQL 17]
-    B --> C[PostgreSQL 18]
-    C --> D[PostgreSQL 19]
-```
-
 ## Quick Start
 
 ```bash
