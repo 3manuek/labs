@@ -1,1 +1,0 @@
-/usr/lib/postgresql/16/bin/postgres "-D" "/var/lib/postgresql/data" "-c" "wal_level=logical" "-c" "max_replication_slots=4" "-c" "max_wal_senders=4" "-c" "listen_addresses=*" "-c" "shared_preload_libraries=pg_cron,pg_partman_bgw" "-c" "listen_addresses=" "-p" "5432"
