@@ -1,0 +1,113 @@
+
+services:
+  postgres13:
+    image: postgres:13
+    container_name: postgres13
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: testdb
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./pg13_data:/var/lib/postgresql/data
+      - ./entrypoint-ori:/docker-entrypoint-initdb.d
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_replication_slots=10"
+      - "-c"
+      - "max_wal_senders=10"
+    networks:
+      - postgres_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres17:
+    image: postgres:17
+    container_name: postgres17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: testdb
+    ports:
+      - "5434:5432"
+    volumes:
+      - ./pg17_data:/var/lib/postgresql/data
+      - ./entrypoint-dest:/docker-entrypoint-initdb.d
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_replication_slots=10"
+      - "-c"
+      - "max_wal_senders=10"
+    networks:
+      - postgres_network
+    depends_on:
+      postgres13:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgbench:
+    build:
+      context: ./docker/pgbench
+      dockerfile: Dockerfile
+    image: pgbench:latest
+    container_name: pgbench
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: testdb
+      PGPASSWORD: postgres
+    volumes:
+      - ./pgbench-scripts/mixed_workload.sql:/mixed_workload.sql
+    ports:
+      - "5435:5432"
+    networks:
+      - postgres_network
+    depends_on:
+      postgres17:
+        condition: service_healthy
+      postgres13:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h postgres13 -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command:
+      - "-h"
+      - "postgres13"
+      - "-c"
+      - "2"
+      - "-U"
+      - "postgres"
+      - "-j"
+      - "2"
+      - "-f"
+      - "/mixed_workload.sql"
+      - "-T"
+      - "3600"
+      - "-P"
+      - "10"
+      - "testdb"
+
+
+volumes:
+  pg13_data:
+  pg17_data:
+
+networks:
+  postgres_network:
+    driver: bridge
