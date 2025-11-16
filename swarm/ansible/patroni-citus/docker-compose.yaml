@@ -183,7 +183,7 @@ services:
         constraints:
           - "node.role == worker"
 
-  coord3:
+  coord3: 
     image: ${PATRONI_TEST_IMAGE:-patroni-citus}
     networks:
       - swarmlab_net
