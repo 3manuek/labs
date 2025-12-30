@@ -1,0 +1,73 @@
+[general]
+host = "0.0.0.0"
+port = 5432
+workers = 1
+pooler_mode = "transaction"
+healthcheck_interval = 30_000
+idle_healthcheck_interval = 30_000
+idle_healthcheck_delay = 5_000
+healthcheck_timeout = 5_000
+ban_timeout = 300_000
+rollback_timeout = 5_000
+load_balancing_strategy = "random"
+read_write_strategy = "conservative"
+tls_certificate = "relative/or/absolute/path/to/certificate.pem"
+tls_private_key = "relative/or/absolute/path/to/private_key.pem"
+tls_client_required = false
+tls_verify = "disabled"
+tls_server_ca_certificate = "relative/or/absolute/path/to/certificate.pem"
+shutdown_timeout = 60_000
+shutdown_termination_timeout = 60_000
+openmetrics_port = 9090
+openmetrics_namespace = "pgdog_"
+prepared_statements = "extended"
+query_parser_enabled = true
+prepared_statements_limit = 1_000
+query_cache_limit = 1_000
+passthrough_auth = "disabled"
+connect_timeout = 5_000
+connect_attempts = 1
+connect_attempt_delay = 1_000
+query_timeout = 60_000
+checkout_timeout = 5_000
+dry_run = false
+idle_timeout = 60_000
+client_idle_timeout = 60_000
+mirror_queue = 128
+auth_type = "scram"
+cross_shard_disabled = false
+dns_ttl = 5_000
+
+[admin]
+name = "admin"
+password = "{{ postgres_password }}"
+user = "{{ postgres_user }}"
+
+[rewrite]
+enabled = false
+shard_key = "ignore"
+split_inserts = "error"
+
+[tcp]
+retries = 3
+time = 1000
+interval = 1000
+user_timeout = 1000
+connect_retries = 3
+congestion_control = "reno"
+
+##
+## Databases
+##
+{% for i in nodes.results %}
+[[databases]]
+name = "{{ postgres_db }}"
+host = "{{ i.stdout }}"
+port = 5432
+role = "primary"
+{% endfor %}
+
+[[sharded_tables]]
+database = "{{ postgres_db }}"
+name = "users"
+column = "id"
