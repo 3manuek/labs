@@ -1,0 +1,306 @@
+services:
+  postgres13:
+    image: postgres:13
+    container_name: postgres13
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: testdb
+    shm_size: '3gb'
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./pg13_data:/var/lib/postgresql/13/data
+      - ./docker/postgres/13/:/docker-entrypoint-initdb.d
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=3GB"
+      - "-c"
+      - "max_wal_size=4GB"
+    networks:
+      - postgres_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres18:
+    image: postgres:18
+    container_name: postgres18
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: testdb
+    shm_size: '3gb'
+    ports:
+      - "5434:5432"
+    volumes:
+      - ./pg18_data:/var/lib/postgresql/18/data
+      - ./docker/postgres/18/:/docker-entrypoint-initdb.d
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=3GB"
+      - "-c"
+      - "max_wal_size=4GB"
+    networks:
+      - postgres_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres_exporter13:
+    image: quay.io/prometheuscommunity/postgres-exporter:latest
+    container_name: postgres_exporter13
+    restart: always
+    depends_on:
+      - postgres13
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:postgres@postgres13:5432/testdb?sslmode=disable"
+    ports:
+      - "9200:9187"
+    networks:
+      - postgres_network
+
+  postgres_exporter18:
+    image: quay.io/prometheuscommunity/postgres-exporter:latest
+    container_name: postgres_exporter18
+    restart: always
+    depends_on:
+      - postgres18
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:postgres@postgres18:5432/testdb?sslmode=disable"
+    ports:
+      - "9201:9187"
+    networks:
+      - postgres_network
+
+  sql_exporter:
+    image: burningalchemist/sql_exporter:latest
+    container_name: sql_exporter
+    restart: always
+    depends_on:
+      - postgres13
+    ports:
+      - "9399:9399"
+    networks:
+      - postgres_network
+    command: ["--config.file=/etc/sql_exporter/sql_exporter.yml"]
+    volumes:
+      - ./docker/sql_exporter:/etc/sql_exporter
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: always
+    ports:
+      - "9090:9090"
+    volumes:
+      # Mount the Prometheus configuration file
+      - ./docker/prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yaml'
+    networks:
+      - postgres_network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: always
+    depends_on:
+      - prometheus
+      - postgres_exporter13
+      - postgres_exporter18
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    # Configure Prometheus as the Grafana data source using provisioning
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - postgres_network
+
+  ### PGBENCH 13 ###
+  pgbench_ori13:
+    build:
+      context: ./docker/pgbench
+      dockerfile: Dockerfile-13
+    image: pgbench:latest
+    restart: on-failure
+    container_name: pgbench_ori13
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: testdb
+      PGPASSWORD: postgres
+    volumes:
+      - ./scripts/upserts.sql:/upserts.sql
+    networks:
+      - postgres_network
+    depends_on:
+      postgres13:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h postgres13 -U postgres"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    command:
+      - "-h"
+      - "postgres13"
+      - "-c"
+      - "4"
+      - "-U"
+      - "postgres"
+      # - "-j"
+      # - "4"
+      - "-f"
+      - "/upserts.sql"
+      - "-T"
+      - "660"
+      - "-P"
+      - "10"
+      - "--progress-timestamp"
+      - "ori13"
+
+  pgbench_onlyff13:
+    build:
+      context: ./docker/pgbench
+      dockerfile: Dockerfile-13
+    image: pgbench:latest
+    restart: on-failure
+    container_name: pgbench_onlyff13
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: testdb
+      PGPASSWORD: postgres
+    volumes:
+      - ./scripts/upserts.sql:/upserts.sql
+    networks:
+      - postgres_network
+    depends_on:
+      postgres13:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h postgres13 -U postgres"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    command:
+      - "-h"
+      - "postgres13"
+      - "-c"
+      - "4"
+      - "-U"
+      - "postgres"
+      # - "-j"
+      # - "4"
+      - "-f"
+      - "/upserts.sql"
+      - "-T"
+      - "660"
+      - "-P"
+      - "10"
+      - "--progress-timestamp"
+      - "onlyff13"
+
+  ### PGBENCH 18 ###
+  pgbench_ori18:
+    build:
+      context: ./docker/pgbench
+      dockerfile: Dockerfile-18
+    image: pgbench:latest
+    restart: on-failure
+    container_name: pgbench_ori18
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: testdb
+      PGPASSWORD: postgres
+    volumes:
+      - ./scripts/upserts.sql:/upserts.sql
+    networks:
+      - postgres_network
+    depends_on:
+      postgres18:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h postgres18 -U postgres"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    command:
+      - "-h"
+      - "postgres18"
+      - "-c"
+      - "4"
+      - "-U"
+      - "postgres"
+      # - "-j"
+      # - "4"
+      - "-f"
+      - "/upserts.sql"
+      - "-T"
+      - "660"
+      - "-P"
+      - "10"
+      - "--progress-timestamp"
+      - "ori18"
+
+  pgbench_onlyff18:
+    build:
+      context: ./docker/pgbench
+      dockerfile: Dockerfile-18
+    image: pgbench:latest
+    restart: on-failure
+    container_name: pgbench_onlyff18
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: testdb
+      PGPASSWORD: postgres
+    volumes:
+      - ./scripts/upserts.sql:/upserts.sql
+    networks:
+      - postgres_network
+    depends_on:
+      postgres18:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h postgres18 -U postgres"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    command:
+      - "-h"
+      - "postgres18"
+      - "-c"
+      - "4"
+      - "-U"
+      - "postgres"
+      # - "-j"
+      # - "4"
+      - "-f"
+      - "/upserts.sql"
+      - "-T"
+      - "660"
+      - "-P"
+      - "10"
+      - "--progress-timestamp"
+      - "onlyff18"
+
+
+# volumes:
+#   pg13_data:
+#   pg18_data:
+
+networks:
+  postgres_network:
+    driver: bridge
