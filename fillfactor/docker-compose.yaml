@@ -115,8 +115,6 @@ services:
     restart: always
     depends_on:
       - prometheus
-      - postgres_exporter13
-      - postgres_exporter18
     ports:
       - "3000:3000"
     environment:
