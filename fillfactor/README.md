@@ -11,6 +11,7 @@ make up-back
 ```
 
 After databases are ready, run the benchmarks:
+
 ```bash
 make start-bench
 ```

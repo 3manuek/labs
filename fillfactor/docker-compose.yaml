@@ -6,18 +6,19 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: testdb
-    shm_size: '3gb'
+    # shm_size: '3gb'
+    shm_size: '128mb'
     ports:
       - "5433:5432"
     volumes:
       - ./pg13_data:/var/lib/postgresql/13/data
       - ./docker/postgres/13/:/docker-entrypoint-initdb.d
-    command:
-      - "postgres"
-      - "-c"
-      - "shared_buffers=3GB"
-      - "-c"
-      - "max_wal_size=4GB"
+    # command:
+    #   - "postgres"
+      # - "-c"
+      # - "shared_buffers=3GB"
+      # - "-c"
+      # - "max_wal_size=4GB"
     networks:
       - postgres_network
     healthcheck:
@@ -33,18 +34,19 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: testdb
-    shm_size: '3gb'
+    # shm_size: '3gb'
+    shm_size: '128mb'
     ports:
       - "5434:5432"
     volumes:
       - ./pg18_data:/var/lib/postgresql/18/data
       - ./docker/postgres/18/:/docker-entrypoint-initdb.d
-    command:
-      - "postgres"
-      - "-c"
-      - "shared_buffers=3GB"
-      - "-c"
-      - "max_wal_size=4GB"
+    # command:
+    #   - "postgres"
+      # - "-c"
+      # - "shared_buffers=3GB"
+      # - "-c"
+      # - "max_wal_size=4GB"
     networks:
       - postgres_network
     healthcheck:

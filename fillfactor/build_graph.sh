@@ -62,7 +62,7 @@ cat > reports/pgbench_chart.html <<EOF
         const data = {
             labels: [$date_labels],
             datasets: [{
-                label: 'v13Original',
+                label: 'v13 Original',
                 data: [$ori_tps13],
                 borderColor: 'rgb(255, 165, 0)',
                 tension: 0.1
@@ -77,7 +77,7 @@ cat > reports/pgbench_chart.html <<EOF
                 borderColor: 'rgb(200, 40, 120)',
                 tension: 0.1
             }, {
-                label: 'v18Fillfactor=50',
+                label: 'v18 Fillfactor=50',
                 data: [$onlyff_tps18],
                 borderColor: 'rgb(29, 122, 235)',
                 tension: 0.1
