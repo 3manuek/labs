@@ -24,9 +24,7 @@
         "name": "Benchmark Events",
         "type": "tags",
         "tags": [
-          "Status v13 benchmark",
-          "Status v18 benchmark",
-          "Status v17 benchmark"
+          "benchmark"
         ]
       }
     ]
