@@ -21,12 +21,23 @@ onlyff_data18=$(docker compose logs pgbench_onlyff18 | grep progress | \
     awk '{print $4, $6}' | sed 's/,//g' | \
     awk '{times=times $1 ","; tps=tps $2 ","} END {print times ";" tps}')
 
+ori_data17=$(docker compose logs pgbench_ori17 | grep progress | \
+    awk '{print $4, $6}' | sed 's/,//g' | \
+    awk '{times=times $1 ","; tps=tps $2 ","} END {print times ";" tps}')
+
+onlyff_data17=$(docker compose logs pgbench_onlyff17 | grep progress | \
+    awk '{print $4, $6}' | sed 's/,//g' | \
+    awk '{times=times $1 ","; tps=tps $2 ","} END {print times ";" tps}')
+
 # Parse into arrays
 # IFS=';' read -r times_str hash_tps <<< "$hash_data"
 IFS=';' read -r times_str ori_tps13 <<< "$ori_data13"
 IFS=';' read -r _ onlyff_tps13 <<< "$onlyff_data13"
 IFS=';' read -r _ ori_tps18 <<< "$ori_data18"
 IFS=';' read -r _ onlyff_tps18 <<< "$onlyff_data18"
+IFS=';' read -r _ ori_tps17 <<< "$ori_data17"
+IFS=';' read -r _ onlyff_tps17 <<< "$onlyff_data17"
+
 
 # Remove trailing commas
 times_str=${times_str%,}
@@ -35,6 +46,8 @@ ori_tps13=${ori_tps13%,}
 onlyff_tps13=${onlyff_tps13%,}
 ori_tps18=${ori_tps18%,}
 onlyff_tps18=${onlyff_tps18%,}
+ori_tps17=${ori_tps17%,}
+onlyff_tps17=${onlyff_tps17%,}
 
 # Convert epoch times to readable dates (macOS compatible)
 times_array=(${times_str//,/ })
@@ -81,7 +94,18 @@ cat > reports/pgbench_chart.html <<EOF
                 data: [$onlyff_tps18],
                 borderColor: 'rgb(29, 122, 235)',
                 tension: 0.1
-            }]
+            },
+            {
+                label: 'v17 Original',
+                data: [$ori_tps17],
+                borderColor: 'rgb(255, 165, 0)',
+                tension: 0.1
+            }, {
+                label: 'v17 Fillfactor=50',
+                data: [$onlyff_tps17],
+                borderColor: 'rgb(0, 255, 0)',
+                tension: 0.1
+            }];
         };
 
         new Chart(document.getElementById('chart'), {

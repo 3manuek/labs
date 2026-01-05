@@ -6,19 +6,19 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: testdb
-    # shm_size: '3gb'
-    shm_size: '128mb'
+    shm_size: '3gb'
+    # shm_size: '128mb'
     ports:
       - "5433:5432"
     volumes:
       - ./pg13_data:/var/lib/postgresql/13/data
       - ./docker/postgres/13/:/docker-entrypoint-initdb.d
-    # command:
-    #   - "postgres"
-      # - "-c"
-      # - "shared_buffers=3GB"
-      # - "-c"
-      # - "max_wal_size=4GB"
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=3GB"
+      - "-c"
+      - "max_wal_size=4GB"
     networks:
       - postgres_network
     healthcheck:
@@ -34,19 +34,47 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: testdb
-    # shm_size: '3gb'
-    shm_size: '128mb'
+    shm_size: '3gb'
+    # shm_size: '128mb'
     ports:
       - "5434:5432"
     volumes:
       - ./pg18_data:/var/lib/postgresql/18/data
       - ./docker/postgres/18/:/docker-entrypoint-initdb.d
-    # command:
-    #   - "postgres"
-      # - "-c"
-      # - "shared_buffers=3GB"
-      # - "-c"
-      # - "max_wal_size=4GB"
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=3GB"
+      - "-c"
+      - "max_wal_size=4GB"
+    networks:
+      - postgres_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres17:
+    image: postgres:17
+    container_name: postgres17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: testdb
+    shm_size: '3gb'
+    # shm_size: '128mb'
+    ports:
+      - "5435:5432"
+    volumes:
+      - ./pg17_data:/var/lib/postgresql/17/data
+      - ./docker/postgres/17/:/docker-entrypoint-initdb.d
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=3GB"
+      - "-c"
+      - "max_wal_size=4GB"
     networks:
       - postgres_network
     healthcheck:
@@ -81,12 +109,25 @@ services:
     networks:
       - postgres_network
 
+  postgres_exporter17:
+    image: quay.io/prometheuscommunity/postgres-exporter:latest
+    container_name: postgres_exporter17
+    restart: always
+    depends_on:
+      - postgres17
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:postgres@postgres17:5432/testdb?sslmode=disable"
+    ports:
+      - "9202:9187"
+    networks:
+      - postgres_network
+
   sql_exporter:
     image: burningalchemist/sql_exporter:latest
     container_name: sql_exporter
     restart: always
-    depends_on:
-      - postgres13
+    # depends_on:
+    #   - postgres13
     ports:
       - "9399:9399"
     networks:
@@ -163,7 +204,7 @@ services:
       - "-f"
       - "/upserts.sql"
       - "-T"
-      - "660"
+      - "600"
       - "-P"
       - "10"
       - "--progress-timestamp"
@@ -205,7 +246,7 @@ services:
       - "-f"
       - "/upserts.sql"
       - "-T"
-      - "660"
+      - "600"
       - "-P"
       - "10"
       - "--progress-timestamp"
@@ -248,7 +289,7 @@ services:
       - "-f"
       - "/upserts.sql"
       - "-T"
-      - "660"
+      - "600"
       - "-P"
       - "10"
       - "--progress-timestamp"
@@ -290,16 +331,102 @@ services:
       - "-f"
       - "/upserts.sql"
       - "-T"
-      - "660"
+      - "600"
       - "-P"
       - "10"
       - "--progress-timestamp"
       - "onlyff18"
 
+  ### PGBENCH 17 ###
+  pgbench_ori17:
+    build:
+      context: ./docker/pgbench
+      dockerfile: Dockerfile-17
+    image: pgbench:latest
+    restart: on-failure
+    container_name: pgbench_ori17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: testdb
+      PGPASSWORD: postgres
+    volumes:
+      - ./scripts/upserts.sql:/upserts.sql
+    networks:
+      - postgres_network
+    depends_on:
+      postgres17:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h postgres17 -U postgres"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    command:
+      - "-h"
+      - "postgres17"
+      - "-c"
+      - "4"
+      - "-U"
+      - "postgres"
+      # - "-j"
+      # - "4"
+      - "-f"
+      - "/upserts.sql"
+      - "-T"
+      - "600"
+      - "-P"
+      - "10"
+      - "--progress-timestamp"
+      - "ori17"
+
+  pgbench_onlyff17:
+    build:
+      context: ./docker/pgbench
+      dockerfile: Dockerfile-17
+    image: pgbench:latest
+    restart: on-failure
+    container_name: pgbench_onlyff17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: testdb
+      PGPASSWORD: postgres
+    volumes:
+      - ./scripts/upserts.sql:/upserts.sql
+    networks:
+      - postgres_network
+    depends_on:
+      postgres17:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h postgres17 -U postgres"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    command:
+      - "-h"
+      - "postgres17"
+      - "-c"
+      - "4"
+      - "-U"
+      - "postgres"
+      # - "-j"
+      # - "4"
+      - "-f"
+      - "/upserts.sql"
+      - "-T"
+      - "600"
+      - "-P"
+      - "10"
+      - "--progress-timestamp"
+      - "onlyff17"
+
 
 # volumes:
 #   pg13_data:
 #   pg18_data:
+#   pg17_data:
 
 networks:
   postgres_network:

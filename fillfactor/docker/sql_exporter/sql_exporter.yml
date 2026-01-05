@@ -13,6 +13,8 @@ jobs:
           onlyff13: 'postgresql://postgres:postgres@postgres13:5432/onlyff13?sslmode=disable'
           ori18: 'postgresql://postgres:postgres@postgres18:5432/ori18?sslmode=disable'
           onlyff18: 'postgresql://postgres:postgres@postgres18:5432/onlyff18?sslmode=disable'
+          ori17: 'postgresql://postgres:postgres@postgres17:5432/ori17?sslmode=disable'
+          onlyff17: 'postgresql://postgres:postgres@postgres17:5432/onlyff17?sslmode=disable'
           # by_hash: 'postgresql://postgres:postgres@postgres13:5432/by_hash?sslmode=disable'
   # - job_name: server
   #   collectors: [server]
