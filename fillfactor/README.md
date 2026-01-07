@@ -8,14 +8,20 @@ More information in [Slow Upserts on projects](https://workato.atlassian.net/wik
 
 ```bash
 make up-back
+make up-postgres
 ```
 
 After databases are ready, run the benchmarks:
 
 ```bash
-make start-bench
+make bench-all
 ```
 
+Clean:
+
+```bash
+make clean
+```
 
 ## Query
 

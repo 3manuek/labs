@@ -20,10 +20,38 @@
         "enable": true,
         "hide": false,
         "iconColor": "rgba(255, 96, 96, 1)",
-        "name": "Benchmark Events",
+        "name": "Benchmark Events v13",
         "type": "tags",
         "tags": [
-          "benchmark"
+          "v13"
+        ]
+      },
+      {
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": false,
+        "iconColor": "rgba(96, 255, 96, 1)",
+        "name": "Benchmark Events v17",
+        "type": "tags",
+        "tags": [
+          "v17"
+        ]
+      },
+      {
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": false,
+        "iconColor": "rgba(255, 255, 96, 1)",
+        "name": "Benchmark Events v18",
+        "type": "tags",
+        "tags": [
+          "v18"
         ]
       }
     ]
