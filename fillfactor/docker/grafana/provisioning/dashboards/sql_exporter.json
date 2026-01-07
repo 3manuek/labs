@@ -335,9 +335,12 @@
       "id": 13,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
+          "calcs": [
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "right",
           "showLegend": true
         },
         "tooltip": {
@@ -730,7 +733,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 9,
         "w": 24,
         "x": 0,
         "y": 42
@@ -738,9 +741,12 @@
       "id": 7,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
+          "calcs": [
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "right",
           "showLegend": true
         },
         "tooltip": {
@@ -824,10 +830,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 9,
         "w": 24,
         "x": 0,
-        "y": 50
+        "y": 51
       },
       "id": 6,
       "options": {
@@ -866,7 +872,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 58
+        "y": 60
       },
       "id": 2,
       "panels": [],
@@ -938,7 +944,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 59
+        "y": 61
       },
       "id": 3,
       "options": {
@@ -1032,7 +1038,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 66
+        "y": 68
       },
       "id": 4,
       "options": {
@@ -1126,7 +1132,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 74
+        "y": 76
       },
       "id": 1,
       "options": {
