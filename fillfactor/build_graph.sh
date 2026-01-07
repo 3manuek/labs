@@ -49,16 +49,16 @@ onlyff_tps18=${onlyff_tps18%,}
 ori_tps17=${ori_tps17%,}
 onlyff_tps17=${onlyff_tps17%,}
 
-# Convert epoch times to readable dates (macOS compatible)
-times_array=(${times_str//,/ })
-date_labels=""
-for time in "${times_array[@]}"; do
-    # Use macOS date command to convert epoch to readable format
-    readable_date=$(date -r "${time%.*}" "+%H:%M:%S")
-    date_labels="${date_labels}\"${readable_date}\","
-done
-# Remove trailing comma
-date_labels=${date_labels%,}
+# # Convert epoch times to readable dates (macOS compatible)
+# times_array=(${times_str//,/ })
+# date_labels=""
+# for time in "${times_array[@]}"; do
+#     # Use macOS date command to convert epoch to readable format
+#     readable_date=$(date -r "${time%.*}" "+%H:%M:%S")
+#     date_labels="${date_labels}\"${readable_date}\","
+# done
+# # Remove trailing comma
+# date_labels=${date_labels%,}
 
 
 
@@ -73,7 +73,7 @@ cat > reports/pgbench_chart.html <<EOF
     <canvas id="chart"></canvas>
     <script>
         const data = {
-            labels: [$date_labels],
+            labels: [$times_str],
             datasets: [{
                 label: 'v13 Original',
                 data: [$ori_tps13],

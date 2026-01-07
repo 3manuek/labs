@@ -45,23 +45,25 @@ bench-all:
 	@$(MAKE) start-bench-13
 	@sleep 630
 	@$(MAKE) stop-bench-13
+	@sleep 10
 	@$(MAKE) start-bench-17
 	@sleep 630
 	@$(MAKE) stop-bench-17
+	@sleep 10
 	@$(MAKE) start-bench-18
 	@sleep 630
 	@$(MAKE) stop-bench-18
 	
 down-13:
-	@docker compose down -v postgres13 postgres_exporter13
+	@docker compose down -v postgres13 
 	@rm -rf pg13_data/
 
 down-17:
-	@docker compose down -v postgres17 postgres_exporter17
+	@docker compose down -v postgres17 
 	@rm -rf pg17_data/
 
 down-18:
-	@docker compose down -v postgres18 postgres_exporter18
+	@docker compose down -v postgres18 
 	@rm -rf pg18_data/
 
 clean:
