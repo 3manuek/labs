@@ -116,7 +116,8 @@ docker-command:
 	@curl -X POST http://localhost:3000/api/annotations \
 		-H "Content-Type: application/json" \
 		-u "admin:admin" \
-		-d '{"text": "Started Benchmark Clients:$(CLIENTS) Jobs:$(JOBS) Time:$(TIME) Progress:$(PROGRESS)", "tags": ["v$(VERSION)", "$(DB)"]}' || true
+		-d '{"text": "Started Benchmark Script:$(SCRIPT) Clients:$(CLIENTS) Jobs:$(JOBS) Time:$(TIME)", "tags": ["v$(VERSION)", "$(DB)"]}' || true
+	@sleep 10
 	@docker run -d --rm \
 		--name pgbench$(VERSION) \
 		--network fillfactor_postgres_network \
@@ -139,7 +140,7 @@ docker-command:
 	@curl -X POST http://localhost:3000/api/annotations \
 		-H "Content-Type: application/json" \
 		-u "admin:admin" \
-		-d '{"text": "StoppedBenchmark Clients:$(CLIENTS) Jobs:$(JOBS) Time:$(TIME) Progress:$(PROGRESS)", "tags": ["v$(VERSION)", "$(DB)"]}' || true
+		-d '{"text": "Stopped Benchmark Script:$(SCRIPT) Clients:$(CLIENTS) Jobs:$(JOBS) Time:$(TIME)", "tags": ["v$(VERSION)", "$(DB)"]}' || true
 	@sleep 5
 
 
