@@ -7,6 +7,7 @@ More information in [Slow Upserts on projects](https://workato.atlassian.net/wik
 ## Setup and run
 
 ```bash
+make build-pgbench
 make up-back
 make up-postgres
 ```
@@ -15,6 +16,10 @@ After databases are ready, run the benchmarks:
 
 ```bash
 make bench-all
+```
+
+```bash
+make  SCRIPT=/upserts.sql CLIENTS=16 JOBS=2 TIME=30 PROGRESS=10 bench-all-custom
 ```
 
 Clean:

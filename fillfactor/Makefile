@@ -4,6 +4,9 @@ up:
 upd:
 	@docker compose up -d
 
+build-pgbench:
+	@docker compose build pgbench13 pgbench17 pgbench18
+
 up-back:
 	@docker compose up -d prometheus grafana sql_exporter postgres_exporter13 postgres_exporter17 postgres_exporter18
 
@@ -109,6 +112,45 @@ bench-all:
 	@$(MAKE) stop-bench-18-onlyff
 	@sleep 10
 	
+docker-command:
+	@curl -X POST http://localhost:3000/api/annotations \
+		-H "Content-Type: application/json" \
+		-u "admin:admin" \
+		-d '{"text": "Started Benchmark Clients:$(CLIENTS) Jobs:$(JOBS) Time:$(TIME) Progress:$(PROGRESS)", "tags": ["v$(VERSION)", "$(DB)"]}' || true
+	@docker run -d --rm \
+		--name pgbench$(VERSION) \
+		--network fillfactor_postgres_network \
+		-e HOST=postgres$(VERSION) \
+		-e POSTGRES_USER=postgres \
+		-e POSTGRES_PASSWORD=postgres \
+		-e POSTGRES_DB=$(DB) \
+		-e PGPASSWORD=postgres \
+		-e SCRIPT=$(SCRIPT) \
+		-e CLIENTS=$(CLIENTS) \
+		-e JOBS=$(JOBS) \
+		-e TIME=$(TIME) \
+		-e PROGRESS=$(PROGRESS) \
+		-v $(PWD)/scripts$(SCRIPT):$(SCRIPT) \
+		pgbench:$(VERSION)
+
+	@sleep 60
+	@sleep $(TIME)
+
+	@curl -X POST http://localhost:3000/api/annotations \
+		-H "Content-Type: application/json" \
+		-u "admin:admin" \
+		-d '{"text": "StoppedBenchmark Clients:$(CLIENTS) Jobs:$(JOBS) Time:$(TIME) Progress:$(PROGRESS)", "tags": ["v$(VERSION)", "$(DB)"]}' || true
+	@sleep 5
+
+
+bench-all-custom:
+	@$(MAKE) docker-command VERSION=13 DB=ori13 SCRIPT=$(SCRIPT) CLIENTS=$(CLIENTS) JOBS=$(JOBS) TIME=$(TIME) PROGRESS=$(PROGRESS)
+	@$(MAKE) docker-command VERSION=13 DB=onlyff13 SCRIPT=$(SCRIPT) CLIENTS=$(CLIENTS) JOBS=$(JOBS) TIME=$(TIME) PROGRESS=$(PROGRESS)
+	@$(MAKE) docker-command VERSION=17 DB=ori17 SCRIPT=$(SCRIPT) CLIENTS=$(CLIENTS) JOBS=$(JOBS) TIME=$(TIME) PROGRESS=$(PROGRESS)
+	@$(MAKE) docker-command VERSION=17 DB=onlyff17 SCRIPT=$(SCRIPT) CLIENTS=$(CLIENTS) JOBS=$(JOBS) TIME=$(TIME) PROGRESS=$(PROGRESS)
+	@$(MAKE) docker-command VERSION=18 DB=ori18 SCRIPT=$(SCRIPT) CLIENTS=$(CLIENTS) JOBS=$(JOBS) TIME=$(TIME) PROGRESS=$(PROGRESS)
+	@$(MAKE) docker-command VERSION=18 DB=onlyff18 SCRIPT=$(SCRIPT) CLIENTS=$(CLIENTS) JOBS=$(JOBS) TIME=$(TIME) PROGRESS=$(PROGRESS)
+
 down-13:
 	@docker compose down -v postgres13 
 	@rm -rf pg13_data/

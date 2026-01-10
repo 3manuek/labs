@@ -167,6 +167,75 @@ services:
     networks:
       - postgres_network
 
+  pgbench13:
+    build:
+      context: ./docker/pgbench/13
+      dockerfile: Dockerfile
+    image: pgbench:13
+    restart: on-failure
+    container_name: pgbench13
+    environment:
+      HOST: postgres13
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ori13
+      PGPASSWORD: postgres
+      SCRIPT: /upserts.sql
+      CLIENTS: 16
+      JOBS: 2
+      TIME: 300
+      PROGRESS: 10
+    # volumes:
+    #   - ./scripts/upserts.sql:/upserts.sql
+    networks:
+      - postgres_network
+
+  pgbench17:
+    build:
+      context: ./docker/pgbench/17
+      dockerfile: Dockerfile
+    image: pgbench:17
+    restart: on-failure
+    container_name: pgbench13
+    environment:
+      HOST: postgres17
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ori17
+      PGPASSWORD: postgres
+      SCRIPT: /upserts.sql
+      CLIENTS: 16
+      JOBS: 2
+      TIME: 300
+      PROGRESS: 10
+    # volumes:
+    #   - ./scripts/upserts.sql:/upserts.sql
+    networks:
+      - postgres_network
+
+  pgbench18:
+    build:
+      context: ./docker/pgbench/18
+      dockerfile: Dockerfile
+    image: pgbench:18
+    restart: on-failure
+    container_name: pgbench18
+    environment:
+      HOST: postgres18
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ori18
+      PGPASSWORD: postgres
+      SCRIPT: /upserts.sql
+      CLIENTS: 16
+      JOBS: 2
+      TIME: 300
+      PROGRESS: 10
+    # volumes:
+    #   - ./scripts/upserts.sql:/upserts.sql
+    networks:
+      - postgres_network
+
   ### PGBENCH 13 ###
   pgbench_ori13:
     build:
@@ -196,11 +265,11 @@ services:
       - "-h"
       - "postgres13"
       - "-c"
-      - "4"
+      - "16"
       - "-U"
       - "postgres"
-      # - "-j"
-      # - "4"
+      - "-j"
+      - "2"
       - "-f"
       - "/upserts.sql"
       - "-T"
@@ -238,11 +307,11 @@ services:
       - "-h"
       - "postgres13"
       - "-c"
-      - "4"
+      - "16"
       - "-U"
       - "postgres"
-      # - "-j"
-      # - "4"
+      - "-j"
+      - "2"
       - "-f"
       - "/upserts.sql"
       - "-T"
@@ -281,11 +350,11 @@ services:
       - "-h"
       - "postgres18"
       - "-c"
-      - "4"
+      - "16"
       - "-U"
       - "postgres"
-      # - "-j"
-      # - "4"
+      - "-j"
+      - "2"
       - "-f"
       - "/upserts.sql"
       - "-T"
@@ -323,11 +392,11 @@ services:
       - "-h"
       - "postgres18"
       - "-c"
-      - "4"
+      - "16"
       - "-U"
       - "postgres"
-      # - "-j"
-      # - "4"
+      - "-j"
+      - "2"
       - "-f"
       - "/upserts.sql"
       - "-T"
@@ -366,11 +435,11 @@ services:
       - "-h"
       - "postgres17"
       - "-c"
-      - "4"
+      - "16"
       - "-U"
       - "postgres"
-      # - "-j"
-      # - "4"
+      - "-j"
+      - "2"
       - "-f"
       - "/upserts.sql"
       - "-T"
@@ -408,11 +477,11 @@ services:
       - "-h"
       - "postgres17"
       - "-c"
-      - "4"
+      - "16"
       - "-U"
       - "postgres"
-      # - "-j"
-      # - "4"
+      - "-j"
+      - "2"
       - "-f"
       - "/upserts.sql"
       - "-T"
