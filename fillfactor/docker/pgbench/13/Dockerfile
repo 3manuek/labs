@@ -11,7 +11,7 @@ ARG CLIENTS=16
 ARG JOBS=2
 ARG TIME=300
 ARG PROGRESS=10
-ARG PROGRESS_TIMESTAMP=true
+ARG VAR1=64
 
 # Add PostgreSQL official repository and install pgbench
 RUN LANG=us apt-get update && apt-get install -y wget gnupg lsb-release && \
@@ -44,5 +44,6 @@ ENTRYPOINT ["sh", "-c", "\
     -f ${SCRIPT} \
     -T ${TIME} \
     -P ${PROGRESS} \
+    -D var1=${VAR1} \
     --progress-timestamp \
     ${POSTGRES_DB}"]

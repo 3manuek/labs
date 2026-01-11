@@ -1,4 +1,4 @@
-\set user_id_rand random(1, 6000)
+\set user_id_rand random(1, :var1)
 
 DO $$
 DECLARE
