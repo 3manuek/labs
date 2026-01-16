@@ -25,12 +25,13 @@ down-postgres: down-13 down-17 down-18
 
 	
 docker-command:
+	@mkdir -p logs
+	@echo "Started Benchmark $(VERSION) $(DB) Script:$(SCRIPT) Clients:$(CLIENTS) Jobs:$(JOBS) Time:$(TIME) Var1:$(VAR1)"
 	@curl -X POST http://localhost:3000/api/annotations \
 		-H "Content-Type: application/json" \
 		-u "admin:admin" \
 		-d '{"text": "Started Benchmark Script:$(SCRIPT) Clients:$(CLIENTS) Jobs:$(JOBS) Time:$(TIME) Var1:$(VAR1)", "tags": ["v$(VERSION)", "$(DB)"]}' || true
-	@sleep 5
-	@docker run -d --rm \
+	@docker run --rm \
 		--name pgbench$(VERSION)_$(DB) \
 		--network fillfactor_postgres_network \
 		-e HOST=postgres$(VERSION) \
@@ -45,16 +46,17 @@ docker-command:
 		-e PROGRESS=$(PROGRESS) \
 		-e VAR1=$(VAR1) \
 		-v $(PWD)/scripts$(SCRIPT):$(SCRIPT) \
-		pgbench:$(VERSION)
-
-	@sleep 60
-	@sleep $(TIME)
-
+		pgbench:$(VERSION) > logs/pgbench$(VERSION)_$(DB).log 2>&1
+		
+	@sleep 45
+#	@sleep $(TIME)
+	@echo
 	@curl -X POST http://localhost:3000/api/annotations \
 		-H "Content-Type: application/json" \
 		-u "admin:admin" \
 		-d '{"text": "Stopped Benchmark Script:$(SCRIPT) Clients:$(CLIENTS) Jobs:$(JOBS) Time:$(TIME) Var1:$(VAR1)", "tags": ["v$(VERSION)", "$(DB)"]}' || true
-	@sleep 5
+	@echo
+	@sleep 10
 
 
 bench-all-custom:
