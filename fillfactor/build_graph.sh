@@ -1,5 +1,8 @@
 #!/bin/bash
 
+TITLE_VAR=$1
+FILE_SUFFIX=$2
+
 # Ensure reports directory exists
 mkdir -p reports
 
@@ -8,28 +11,28 @@ mkdir -p reports
 #     awk '{print $4, $6}' | sed 's/,//g' | \
 #     awk '{times=times $1 ","; tps=tps $2 ","} END {print times ";" tps}')
 
-ori_data13=$(docker compose logs pgbench_ori13 2>/dev/null | grep progress 2>/dev/null | \
-    awk '{print $4, $6}' | sed 's/,//g' | \
+ori_data13=$(grep progress logs/pgbench13_ori13.log | \
+    awk '{print $2, $4}' | sed 's/,//g' | \
     awk '{times=times $1 ","; tps=tps $2 ","} END {print times ";" tps}' || echo "")
 
-onlyff_data13=$(docker compose logs pgbench_onlyff13 2>/dev/null | grep progress 2>/dev/null | \
-    awk '{print $4, $6}' | sed 's/,//g' | \
+onlyff_data13=$(grep progress logs/pgbench13_onlyff13.log | \
+    awk '{print $2, $4}' | sed 's/,//g' | \
     awk '{times=times $1 ","; tps=tps $2 ","} END {print times ";" tps}' || echo "")
 
-ori_data18=$(docker compose logs pgbench_ori18 2>/dev/null | grep progress 2>/dev/null | \
-    awk '{print $4, $6}' | sed 's/,//g' | \
+ori_data18=$(grep progress logs/pgbench18_ori18.log | \
+    awk '{print $2, $4}' | sed 's/,//g' | \
     awk '{times=times $1 ","; tps=tps $2 ","} END {print times ";" tps}' || echo "")
 
-onlyff_data18=$(docker compose logs pgbench_onlyff18 2>/dev/null | grep progress 2>/dev/null | \
-    awk '{print $4, $6}' | sed 's/,//g' | \
+onlyff_data18=$(grep progress logs/pgbench18_onlyff18.log | \
+    awk '{print $2, $4}' | sed 's/,//g' | \
     awk '{times=times $1 ","; tps=tps $2 ","} END {print times ";" tps}' || echo "")
 
-ori_data17=$(docker compose logs pgbench_ori17 2>/dev/null | grep progress 2>/dev/null | \
-    awk '{print $4, $6}' | sed 's/,//g' | \
+ori_data17=$(grep progress logs/pgbench17_ori17.log | \
+    awk '{print $2, $4}' | sed 's/,//g' | \
     awk '{times=times $1 ","; tps=tps $2 ","} END {print times ";" tps}' || echo "")
 
-onlyff_data17=$(docker compose logs pgbench_onlyff17 2>/dev/null | grep progress 2>/dev/null | \
-    awk '{print $4, $6}' | sed 's/,//g' | \
+onlyff_data17=$(grep progress logs/pgbench17_onlyff17.log | \
+    awk '{print $2, $4}' | sed 's/,//g' | \
     awk '{times=times $1 ","; tps=tps $2 ","} END {print times ";" tps}' || echo "")
 
 # Parse into arrays
@@ -56,20 +59,20 @@ onlyff_tps17=${onlyff_tps17%,}
 extract_stats() {
     local container=$1
     # Extract TPS - look for "tps = " followed by number
-    local tps=$(docker compose logs "$container" 2>/dev/null | grep "tps = " | tail -1 | sed -n 's/.*tps = \([0-9.]*\).*/\1/p' || echo "")
+    local tps=$(grep "tps = " logs/${container}.log | tail -1 | sed -n 's/.*tps = \([0-9.]*\).*/\1/p' || echo "")
     # Extract latency average - look for "latency average = " followed by number and "ms"
-    local latency=$(docker compose logs "$container" 2>/dev/null | grep "latency average = " | tail -1 | sed -n 's/.*latency average = \([0-9.]*\) ms.*/\1/p' || echo "")
+    local latency=$(grep "latency average = " logs/${container}.log | tail -1 | sed -n 's/.*latency average = \([0-9.]*\) ms.*/\1/p' || echo "")
     # Extract latency stddev - look for "latency stddev = " followed by number and "ms"
-    local stddev=$(docker compose logs "$container" 2>/dev/null | grep "latency stddev = " | tail -1 | sed -n 's/.*latency stddev = \([0-9.]*\) ms.*/\1/p' || echo "")
+    local stddev=$(grep "latency stddev = " logs/${container}.log | tail -1 | sed -n 's/.*latency stddev = \([0-9.]*\) ms.*/\1/p' || echo "")
     echo "${tps};${latency};${stddev}"
 }
 
-stats_ori13=$(extract_stats pgbench_ori13)
-stats_onlyff13=$(extract_stats pgbench_onlyff13)
-stats_ori18=$(extract_stats pgbench_ori18)
-stats_onlyff18=$(extract_stats pgbench_onlyff18)
-stats_ori17=$(extract_stats pgbench_ori17)
-stats_onlyff17=$(extract_stats pgbench_onlyff17)
+stats_ori13=$(extract_stats pgbench13_ori13)
+stats_onlyff13=$(extract_stats pgbench13_onlyff13)
+stats_ori18=$(extract_stats pgbench18_ori18)
+stats_onlyff18=$(extract_stats pgbench18_onlyff18)
+stats_ori17=$(extract_stats pgbench17_ori17)
+stats_onlyff17=$(extract_stats pgbench17_onlyff17)
 
 # Debug: Print extracted stats (comment out in production)
 # echo "Debug - stats_ori13: $stats_ori13" >&2
@@ -101,6 +104,14 @@ ori_tps18=${ori_tps18:-}
 onlyff_tps18=${onlyff_tps18:-}
 ori_tps17=${ori_tps17:-}
 onlyff_tps17=${onlyff_tps17:-}
+
+# JavaScript-safe numeric TPS values for horizontal lines
+tps_ori13_js=${tps_ori13:-null}
+tps_onlyff13_js=${tps_onlyff13:-null}
+tps_ori18_js=${tps_ori18:-null}
+tps_onlyff18_js=${tps_onlyff18:-null}
+tps_ori17_js=${tps_ori17:-null}
+tps_onlyff17_js=${tps_onlyff17:-null}
 
 # Format labels with statistics
 format_label() {
@@ -165,7 +176,7 @@ fi
 
 
 # Generate HTML
-cat > reports/pgbench_chart.html <<EOF
+cat > reports/pgbench_chart_${FILE_SUFFIX}.html <<EOF
 <!DOCTYPE html>
 <html>
 <head>
@@ -181,35 +192,86 @@ cat > reports/pgbench_chart.html <<EOF
                     label: "${label_ori13}",
                     data: [$ori_tps13],
                     borderColor: 'rgb(255, 165, 0)',
+                    backgroundColor: 'rgb(255, 165, 0)',
                     tension: 0.1
                 }, {
                     label: "${label_onlyff13}",
                     data: [$onlyff_tps13],
                     borderColor: 'rgb(0, 255, 0)',
+                    backgroundColor: 'rgb(0, 255, 0)',
                     tension: 0.1
                 }, {
                     label: "${label_ori18}",
                     data: [$ori_tps18],
                     borderColor: 'rgb(200, 40, 120)',
+                    backgroundColor: 'rgb(200, 40, 120)',
                     tension: 0.1
                 }, {
                     label: "${label_onlyff18}",
                     data: [$onlyff_tps18],
                     borderColor: 'rgb(29, 122, 235)',
+                    backgroundColor: 'rgb(29, 122, 235)',
                     tension: 0.1
                 },
                 {
                     label: "${label_ori17}",
                     data: [$ori_tps17],
-                    borderColor: 'rgb(255, 255, 0)',
+                    borderColor: 'rgb(155, 155, 0)',
+                    backgroundColor: 'rgb(155, 155, 0)',
                     tension: 0.1
                 }, {
                     label: "${label_onlyff17}",
                     data: [$onlyff_tps17],
                     borderColor: 'rgb(0, 0, 0)',
+                    backgroundColor: 'rgb(0, 0, 0)',
                     tension: 0.1
                 }].filter(dataset => dataset.data && dataset.data.length > 0)
             };
+
+            const tpsLineConfigs = [{
+                label: "${label_ori13}",
+                tps: ${tps_ori13_js},
+                color: 'rgb(255, 165, 0)'
+            }, {
+                label: "${label_onlyff13}",
+                tps: ${tps_onlyff13_js},
+                color: 'rgb(0, 255, 0)'
+            }, {
+                label: "${label_ori18}",
+                tps: ${tps_ori18_js},
+                color: 'rgb(200, 40, 120)'
+            }, {
+                label: "${label_onlyff18}",
+                tps: ${tps_onlyff18_js},
+                color: 'rgb(29, 122, 235)'
+            }, {
+                label: "${label_ori17}",
+                tps: ${tps_ori17_js},
+                color: 'rgb(155, 155, 0)'
+            }, {
+                label: "${label_onlyff17}",
+                tps: ${tps_onlyff17_js},
+                color: 'rgb(0, 0, 0)'
+            }];
+
+            tpsLineConfigs.forEach((item) => {
+                if (!Number.isFinite(item.tps) || data.labels.length === 0) {
+                    return;
+                }
+                data.datasets.push({
+                    label: '',
+                    data: data.labels.map(() => item.tps),
+                    borderColor: item.color,
+                    borderDash: [6, 6],
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    pointHitRadius: 0,
+                    tension: 0,
+                    fill: false,
+                    isTpsLine: true,
+                    tpsValue: item.tps
+                });
+            });
 
             // Check if we have any data
             if (data.datasets.length === 0) {
@@ -227,21 +289,57 @@ cat > reports/pgbench_chart.html <<EOF
                 throw new Error('Canvas element not found');
             }
 
+            const tpsLineLabelPlugin = {
+                id: 'tpsLineLabelPlugin',
+                afterDatasetsDraw(chart) {
+                    const {ctx, chartArea, scales} = chart;
+                    const yScale = scales.y;
+                    if (!yScale) {
+                        return;
+                    }
+                    ctx.save();
+                    chart.data.datasets.forEach((dataset) => {
+                        if (!dataset.isTpsLine || !Number.isFinite(dataset.tpsValue)) {
+                            return;
+                        }
+                        const y = yScale.getPixelForValue(dataset.tpsValue);
+                        const x = chartArea.right + 6;
+                        ctx.fillStyle = dataset.borderColor || '#000';
+                        ctx.font = '11px sans-serif';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(dataset.tpsValue.toFixed(2), x, y);
+                    });
+                    ctx.restore();
+                }
+            };
+
             new Chart(ctx, {
             type: 'line',
             data: data,
             options: {
                 responsive: true,
+                layout: {
+                    padding: {
+                        right: 60
+                    }
+                },
                 plugins: {
                     title: {
                         display: true,
-                        text: 'pgbench: Hot-Updates TPS Comparison'
+                        text: 'pgbench: Hot-Updates TPS Comparison ${TITLE_VAR}'
                     },
                     legend: {
                         display: true,
                         position: 'bottom',
                         labels: {
-                            boxWidth: 20,
+                            filter: (legendItem, chartData) => {
+                                const dataset = chartData.datasets[legendItem.datasetIndex];
+                                return !dataset || !dataset.isTpsLine;
+                            },
+                            usePointStyle: true,
+                            pointStyle: 'rect',
+                            boxWidth: 12,
+                            boxHeight: 12,
                             padding: 15,
                             font: {
                                 size: 11
@@ -263,7 +361,8 @@ cat > reports/pgbench_chart.html <<EOF
                         }
                     }
                 }
-            }
+            },
+            plugins: [tpsLineLabelPlugin]
             });
         } catch (error) {
             console.error('Error rendering chart:', error);
@@ -274,5 +373,5 @@ cat > reports/pgbench_chart.html <<EOF
 </html>
 EOF
 
-echo "Chart generated successfully at reports/pgbench_chart.html"
+echo "Chart generated successfully at reports/pgbench_chart_${FILE_SUFFIX}.html"
 exit 0

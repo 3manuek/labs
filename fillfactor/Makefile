@@ -27,6 +27,7 @@ down-postgres: down-13 down-17 down-18
 docker-command:
 	@mkdir -p logs
 	@echo "Started Benchmark $(VERSION) $(DB) Script:$(SCRIPT) Clients:$(CLIENTS) Jobs:$(JOBS) Time:$(TIME) Var1:$(VAR1)"
+	@sleep 10
 	@curl -X POST http://localhost:3000/api/annotations \
 		-H "Content-Type: application/json" \
 		-u "admin:admin" \
@@ -49,15 +50,15 @@ docker-command:
 		pgbench:$(VERSION) > logs/pgbench$(VERSION)_$(DB).log 2>&1
 		
 	@sleep 45
-#	@sleep $(TIME)
 	@echo
 	@curl -X POST http://localhost:3000/api/annotations \
 		-H "Content-Type: application/json" \
 		-u "admin:admin" \
 		-d '{"text": "Stopped Benchmark Script:$(SCRIPT) Clients:$(CLIENTS) Jobs:$(JOBS) Time:$(TIME) Var1:$(VAR1)", "tags": ["v$(VERSION)", "$(DB)"]}' || true
 	@echo
-	@sleep 10
 
+build-graph:
+	@./build_graph.sh "Clients:$(CLIENTS) Jobs:$(JOBS) Time:$(TIME) Records:$(VAR1)" "c$(CLIENTS)_j$(JOBS)_t$(TIME)_records$(VAR1)"
 
 bench-all-custom:
 	@$(MAKE) docker-command VERSION=13 DB=ori13 SCRIPT=$(SCRIPT) CLIENTS=$(CLIENTS) JOBS=$(JOBS) TIME=$(TIME) PROGRESS=$(PROGRESS)
@@ -66,6 +67,7 @@ bench-all-custom:
 	@$(MAKE) docker-command VERSION=13 DB=onlyff13 SCRIPT=$(SCRIPT) CLIENTS=$(CLIENTS) JOBS=$(JOBS) TIME=$(TIME) PROGRESS=$(PROGRESS)
 	@$(MAKE) docker-command VERSION=17 DB=onlyff17 SCRIPT=$(SCRIPT) CLIENTS=$(CLIENTS) JOBS=$(JOBS) TIME=$(TIME) PROGRESS=$(PROGRESS)
 	@$(MAKE) docker-command VERSION=18 DB=onlyff18 SCRIPT=$(SCRIPT) CLIENTS=$(CLIENTS) JOBS=$(JOBS) TIME=$(TIME) PROGRESS=$(PROGRESS)
+	@$(MAKE) build-graph
 
 down-13:
 	@docker compose down -v postgres13 
