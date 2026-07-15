@@ -1,0 +1,62 @@
+\c by_hash18
+
+CREATE TABLE projects (
+    folder_id       integer NOT NULL,
+    user_id         integer NOT NULL,
+    team_id         integer NOT NULL,
+    activity_log_id integer NOT NULL,
+    edited_at       timestamp without time zone NOT NULL,
+    PRIMARY KEY (folder_id, user_id)
+) PARTITION BY HASH (folder_id, user_id);
+
+
+CREATE INDEX ON projects (team_id);
+
+-- Create 16 partitions
+CREATE TABLE projects_p0 PARTITION OF projects
+    FOR VALUES WITH (MODULUS 16, REMAINDER 0) ;
+
+CREATE TABLE projects_p1 PARTITION OF projects
+    FOR VALUES WITH (MODULUS 16, REMAINDER 1) ;
+
+CREATE TABLE projects_p2 PARTITION OF projects
+    FOR VALUES WITH (MODULUS 16, REMAINDER 2) ;
+
+CREATE TABLE projects_p3 PARTITION OF projects
+    FOR VALUES WITH (MODULUS 16, REMAINDER 3) ;
+
+CREATE TABLE projects_p4 PARTITION OF projects
+    FOR VALUES WITH (MODULUS 16, REMAINDER 4) ;
+
+CREATE TABLE projects_p5 PARTITION OF projects
+    FOR VALUES WITH (MODULUS 16, REMAINDER 5) ;
+
+CREATE TABLE projects_p6 PARTITION OF projects
+    FOR VALUES WITH (MODULUS 16, REMAINDER 6) ;
+
+CREATE TABLE projects_p7 PARTITION OF projects
+    FOR VALUES WITH (MODULUS 16, REMAINDER 7) ;
+
+CREATE TABLE projects_p8 PARTITION OF projects
+    FOR VALUES WITH (MODULUS 16, REMAINDER 8) ;
+
+CREATE TABLE projects_p9 PARTITION OF projects
+    FOR VALUES WITH (MODULUS 16, REMAINDER 9) ;
+
+CREATE TABLE projects_p10 PARTITION OF projects
+    FOR VALUES WITH (MODULUS 16, REMAINDER 10) ;
+
+CREATE TABLE projects_p11 PARTITION OF projects
+    FOR VALUES WITH (MODULUS 16, REMAINDER 11) ;
+
+CREATE TABLE projects_p12 PARTITION OF projects
+    FOR VALUES WITH (MODULUS 16, REMAINDER 12) ;
+
+CREATE TABLE projects_p13 PARTITION OF projects
+    FOR VALUES WITH (MODULUS 16, REMAINDER 13) ;
+
+CREATE TABLE projects_p14 PARTITION OF projects
+    FOR VALUES WITH (MODULUS 16, REMAINDER 14) ;
+
+CREATE TABLE projects_p15 PARTITION OF projects
+    FOR VALUES WITH (MODULUS 16, REMAINDER 15) ;

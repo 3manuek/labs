@@ -1,0 +1,5 @@
+\c ori18
+VACUUM ANALYZE;
+
+\c onlyff18
+VACUUM ANALYZE;
