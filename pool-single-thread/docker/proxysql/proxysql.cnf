@@ -1,0 +1,40 @@
+# ProxySQL 3.0.x — PostgreSQL module, single worker thread.
+# Loaded on every start because the container runs with `--initial` (and a tmpfs datadir).
+# Settings aligned with docker/pgbouncer/pgbouncer.ini (pool of 20 backend connections).
+
+datadir="/var/lib/proxysql"
+
+admin_variables=
+{
+    # `admin` is local-only; `radmin` is used from other containers / the host
+    admin_credentials="admin:admin;radmin:radmin"
+    mysql_ifaces="0.0.0.0:6032"
+    pgsql_ifaces="0.0.0.0:6132"
+    restapi_enabled=false   # pgbouncer does not provide this, so I disabled it
+    # restapi_port=6070
+    prometheus_memory_metrics_interval=10
+}
+
+pgsql_variables=
+{
+    threads=1                     # <- single worker thread (PgBouncer is single-threaded)
+    max_connections=4000          # client side, like pgbouncer max_client_conn
+    interfaces="0.0.0.0:6133"
+    server_version="18.0"
+    multiplexing=true             # transaction-level backend reuse (= pool_mode=transaction)
+    monitor_enabled=false         # no health-check traffic during the benchmark
+    monitor_username="monitor"
+    monitor_password="monitor"
+    commands_stats=true
+    query_digests=false            # ProxySQL default is true; but for this test makes not much sense. See README "Fairness knobs"
+}
+
+pgsql_servers=
+(
+    { address="postgres", port=5432, hostgroup_id=0, max_connections=20 }
+)
+
+pgsql_users=
+(
+    { username="bench", password="bench", default_hostgroup=0, active=1, max_connections=4000 }
+)
