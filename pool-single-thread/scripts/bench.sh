@@ -201,7 +201,7 @@ run_pgbench() {   # celldir cmd...
   local dir="$1"; shift
   docker run --rm --name "$BENCH_CTR" --network "$NET" --cpuset-cpus "$BENCH_CPUSET" \
     --user "$(id -u):$(id -g)" --ulimit nofile=65536:65536 \
-    -e PGPASSWORD=bench -e PGAPPNAME=pst-bench \
+    -e PGPASSWORD=bench -e PGAPPNAME=pst-bench -e PGSSLMODE=disable \
     -v "$LAB_DIR/workloads:/workloads:ro" -v "$LAB_DIR/$dir:/out" \
     --entrypoint sh "$POSTGRES_IMAGE" -c "$*"
 }

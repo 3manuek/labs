@@ -222,7 +222,26 @@ make clean                # delete volumes (asks first)
 
 ## Fairness knobs and caveats
 
-- **ProxySQL `query_digests=true`** is the default and is turned to **false**. Digesting every query costs CPU on the single thread. Set it to `false` in `proxysql.cnf` to measure pure forwarding.
+- **ProxySQL features with no PgBouncer counterpart are disabled or matched** (`proxysql.cnf`, plus `-M --no-version-check` in `docker-compose.yaml`):
+
+  | ProxySQL setting | default → lab | why | PgBouncer equivalent |
+  |---|---|---|---|
+  | `pgsql-query_digests` | true → false | per-query digest work; no routing/stats needed | none |
+  | `pgsql-commands_stats` | true → false | with digests off, skips the per-query parser | none (only `SHOW STATS` totals) |
+  | `pgsql-free_connections_pct` | 10 → 100 | default keeps only ~2 of 20 idle backends | `server_idle_timeout=600` |
+  | `pgsql-max_stmts_per_connection` | 20 → 200 | backends over the limit are destroyed | `max_prepared_statements=200` |
+  | `pgsql-ping_interval_server_msec` | 10000 → 30000 | idle backend pings | `server_check_delay=30` |
+  | `pgsql-auto_increment_delay_multiplex` | 5 → 0 | MySQL concept, harmless at 0 | none |
+  | `pgsql-connect_timeout_server_max` | 10000 → 120000 ms | with 512 clients on 20 backends, clients waiting > 10 s got an error | `query_wait_timeout=120` |
+  | `pgsql-sessions_sort` | set explicitly to true | docs and source disagree on the default | none |
+  | `mysql-threads` / `mysql-monitor_enabled` | 4 / true → 1 / false | MySQL module always starts on the same core | none |
+  | `admin-stats_*` intervals | 60s → 300–600s | background SQLite stats history | none |
+  | `admin-prometheus_memory_metrics_interval` | 61 (kept) | 0 would mean "on every scrape" | none |
+  | `-M`, `--no-version-check` | startup flags | no monitor, no version-check thread | none |
+
+  Both poolers are scraped every 5 s: ProxySQL by its REST API (`/metrics`), PgBouncer by `pgbouncer_exporter`. If you disable one, disable both.
+  pgbench runs with `PGSSLMODE=disable` against every target, so no client negotiates TLS.
+  Some limits (`admin-stats_*` maximums, the minimum `mysql-threads`) are not verified. Check what was loaded with `make proxysql-admin` → `select * from runtime_global_variables;`.
 - **ProxySQL extended protocol** has been supported since 3.0.3, with limitations: unnamed portals only, `Flush` and `Execute(maxRows)` are ignored, and `COPY FROM STDIN` is not supported in extended mode. `-M extended` and `-M prepared` should work, but check `failed` in the results.
 - **PgBouncer prepared statements**: `max_prepared_statements=200` (the default in 1.26) enables protocol-level prepared statements in transaction mode.
 - **ProxySQL users are stored in clear text** in `pgsql_users`. It does the SCRAM exchange with clients itself and logs in to the backend with the same password. Both poolers keep their pool warm, so backend SCRAM cost does not show up in the measured window.

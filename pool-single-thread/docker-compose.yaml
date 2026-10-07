@@ -77,8 +77,9 @@ services:
     sysctls:
       net.core.somaxconn: 4096
     # --initial: always rebuild the runtime config from proxysql.cnf (idempotent restarts)
+    # -M: no monitor modules · --no-version-check: no background version-check thread
     entrypoint: ["proxysql"]
-    command: ["-f", "--initial", "-c", "/etc/proxysql.cnf", "-D", "/var/lib/proxysql"]
+    command: ["-f", "--initial", "-M", "--no-version-check", "-c", "/etc/proxysql.cnf", "-D", "/var/lib/proxysql"]
     ports:
       - "${PROXYSQL_PORT}:6133"
       - "${PROXYSQL_ADMIN_PORT}:6132"
