@@ -1,0 +1,185 @@
+name: pool-single-thread
+
+x-common: &common
+  restart: unless-stopped
+  networks: [labnet]
+  ulimits:
+    nofile: { soft: 65536, hard: 65536 }
+
+x-mon: &mon
+  <<: *common
+  cpuset: "${MON_CPUSET}"
+
+services:
+  # ---------------------------------------------------------------- database
+  postgres:
+    <<: *common
+    image: ${POSTGRES_IMAGE}
+    container_name: pst-postgres
+    cpuset: "${PG_CPUSET}"
+    shm_size: 2g
+    sysctls:
+      net.core.somaxconn: 4096
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      SCALE: ${SCALE}
+      ORDERS_PER_ACCOUNT: ${ORDERS_PER_ACCOUNT}
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+    ports: ["${PG_PORT}:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
+      - ./docker/postgres/reset_bench_db.sql:/lab/reset_bench_db.sql:ro
+    healthcheck:
+      # healthy only once the seed finished and the real server listens on TCP
+      # (during initdb the temporary server only listens on the unix socket)
+      test: ["CMD-SHELL", "PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d postgres -tAc \"select 1 from pg_database where datname='bench'\" | grep -q 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 120
+      start_period: 30s
+
+  # ---------------------------------------------------------------- poolers
+  pgbouncer:
+    <<: *common
+    build:
+      context: ./docker/pgbouncer
+      args:
+        PGBOUNCER_VERSION: ${PGBOUNCER_VERSION}
+    image: pst-pgbouncer:${PGBOUNCER_VERSION}
+    container_name: pst-pgbouncer
+    cpuset: "${PGBOUNCER_CPUSET}"
+    sysctls:
+      net.core.somaxconn: 4096
+    ports: ["${PGBOUNCER_PORT}:6432"]
+    volumes:
+      - ./docker/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./docker/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 6432"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  proxysql:
+    <<: *common
+    image: ${PROXYSQL_IMAGE}
+    container_name: pst-proxysql
+    cpuset: "${PROXYSQL_CPUSET}"
+    sysctls:
+      net.core.somaxconn: 4096
+    # --initial: always rebuild the runtime config from proxysql.cnf (idempotent restarts)
+    # -M: no monitor modules · --no-version-check: no background version-check thread
+    entrypoint: ["proxysql"]
+    command: ["-f", "--initial", "-M", "--no-version-check", "-c", "/etc/proxysql.cnf", "-D", "/var/lib/proxysql"]
+    ports:
+      - "${PROXYSQL_PORT}:6133"
+      - "${PROXYSQL_ADMIN_PORT}:6132"
+    volumes:
+      - ./docker/proxysql/proxysql.cnf:/etc/proxysql.cnf:ro
+    tmpfs:
+      - /var/lib/proxysql
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/6133'"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  # ---------------------------------------------------------------- exporters
+  postgres_exporter:
+    <<: *mon
+    image: ${POSTGRES_EXPORTER_IMAGE}
+    container_name: pst-postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:postgres@postgres:5432/postgres?sslmode=disable"
+    command: ["--collector.stat_statements"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  sql_exporter:
+    <<: *mon
+    image: ${SQL_EXPORTER_IMAGE}
+    container_name: pst-sql-exporter
+    command: ["--config.file=/etc/sql_exporter/sql_exporter.yml"]
+    volumes:
+      - ./docker/sql_exporter:/etc/sql_exporter:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  pgbouncer_exporter:
+    <<: *mon
+    image: ${PGBOUNCER_EXPORTER_IMAGE}
+    container_name: pst-pgbouncer-exporter
+    environment:
+      PGBOUNCER_EXPORTER_CONNECTION_STRING: "postgres://stats:stats@pgbouncer:6432/pgbouncer?sslmode=disable"
+    depends_on:
+      pgbouncer: { condition: service_healthy }
+
+  cadvisor:
+    <<: *mon
+    image: ${CADVISOR_IMAGE}
+    container_name: pst-cadvisor
+    privileged: true
+    command: ["--docker_only=true", "--housekeeping_interval=2s", "--store_container_labels=false",
+              "--whitelisted_container_labels=com.docker.compose.service"]
+    ports: ["${CADVISOR_PORT}:8080"]
+    devices: ["/dev/kmsg"]
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+
+  # ---------------------------------------------------------------- monitoring
+  pushgateway:
+    <<: *mon
+    image: ${PUSHGATEWAY_IMAGE}
+    container_name: pst-pushgateway
+    ports: ["${PUSHGATEWAY_PORT}:9091"]
+
+  prometheus:
+    <<: *mon
+    image: ${PROMETHEUS_IMAGE}
+    container_name: pst-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yaml
+      - --storage.tsdb.retention.time=30d
+    ports: ["${PROMETHEUS_PORT}:9090"]
+    volumes:
+      - ./docker/prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - promdata:/prometheus
+
+  grafana:
+    <<: *mon
+    image: ${GRAFANA_IMAGE}
+    container_name: pst-grafana
+    depends_on: [prometheus]
+    ports: ["${GRAFANA_PORT}:3000"]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/pst-overview.json
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafanadata:/var/lib/grafana
+
+volumes:
+  pgdata:
+  promdata:
+  grafanadata:
+
+networks:
+  labnet:
+    name: pst-net
+    driver: bridge

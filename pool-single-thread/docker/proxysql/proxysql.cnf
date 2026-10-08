@@ -1,0 +1,64 @@
+# ProxySQL 3.0.x — PostgreSQL module, single worker thread.
+# Loaded on every start because the container runs with `--initial` (and a tmpfs datadir).
+# Settings aligned with docker/pgbouncer/pgbouncer.ini (pool of 20 backend connections).
+# Features with no PgBouncer counterpart are disabled or minimised: see README "Fairness knobs".
+# Verify the loaded values with: select * from runtime_global_variables;
+
+datadir="/var/lib/proxysql"
+restart_on_missing_heartbeats=10          # watchdog (default, made explicit)
+
+admin_variables=
+{
+    # `admin` is local-only; `radmin` is used from other containers / the host
+    admin_credentials="admin:admin;radmin:radmin"
+    mysql_ifaces="0.0.0.0:6032"
+    pgsql_ifaces="0.0.0.0:6132"
+    restapi_enabled=true                   # /metrics scraped every 5s, same as pgbouncer_exporter on PgBouncer
+    restapi_port=6070
+    prometheus_memory_metrics_interval=61  # default (0 = refresh on every scrape)
+    # background stats history (SQLite) as rare as possible
+    stats_system_cpu=600
+    stats_system_memory=600                # max not verified
+    stats_mysql_connections=300
+    stats_mysql_connection_pool=300        # max not verified
+    stats_mysql_query_cache=300            # max not verified
+}
+
+# The MySQL module always starts; keep it minimal on the shared core.
+mysql_variables=
+{
+    threads=1                              # minimum not verified
+    monitor_enabled=false
+}
+
+pgsql_variables=
+{
+    threads=1                     # <- single worker thread (PgBouncer is single-threaded)
+    max_connections=4000          # client side, like pgbouncer max_client_conn
+    interfaces="0.0.0.0:6133"
+    server_version="18.0"
+    multiplexing=true             # transaction-level backend reuse (= pool_mode=transaction)
+    monitor_enabled=false         # no health-check traffic during the benchmark
+    monitor_username="monitor"
+    monitor_password="monitor"
+    commands_stats=false          # with query_digests=false the per-query parser is skipped
+    query_digests=false           # ProxySQL default is true; no digest/stats/routing needed here
+    free_connections_pct=100      # keep all idle backends (default 10 => ~2 of 20); ~ pgbouncer server_idle_timeout
+    max_stmts_per_connection=200  # = pgbouncer max_prepared_statements (default 20)
+    ping_interval_server_msec=30000  # ~ pgbouncer server_check_delay=30
+    auto_increment_delay_multiplex=0
+    connection_max_age_ms=0       # no forced reconnects during a run
+    connection_warming=false      # = pgbouncer min_pool_size=0
+    sessions_sort=true            # docs and source disagree on the default: explicit
+    connect_timeout_server_max=120000  # max wait for a free backend (default 10000) = pgbouncer query_wait_timeout=120
+}
+
+pgsql_servers=
+(
+    { address="postgres", port=5432, hostgroup_id=0, max_connections=20 }
+)
+
+pgsql_users=
+(
+    { username="bench", password="bench", default_hostgroup=0, active=1, max_connections=4000 }
+)
