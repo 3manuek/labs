@@ -2,7 +2,7 @@
 # Steps are split so a failure points at the exact stage:
 #   docker compose build --progress=plain pgbouncer
 FROM alpine:3.22 AS build
-ARG PGBOUNCER_VERSION=1.26.0
+ARG PGBOUNCER_VERSION=1.26.1
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 RUN apk add --no-cache build-base pkgconf libevent-dev openssl-dev c-ares-dev curl ca-certificates tar
 

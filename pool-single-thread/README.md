@@ -13,8 +13,8 @@ This lab measures how much **throughput and latency** each connection pooler can
 | component | version | notes |
 |---|---|---|
 | PostgreSQL | `postgres:18` (18.x stable) | dataset fits in `shared_buffers`; `synchronous_commit=off` |
-| PgBouncer | 1.26.0, built from the release tarball (`docker/pgbouncer/Dockerfile`) | `pool_mode=transaction` |
-| ProxySQL | `proxysql/proxysql:3.0.10` (stable tier) | `threads=1`, `multiplexing=true`, monitor off |
+| PgBouncer | 1.26.1, built from the release tarball (`docker/pgbouncer/Dockerfile`) | `pool_mode=transaction` |
+| ProxySQL | `proxysql/proxysql:3.0.12` (stable tier) | `threads=1`, `multiplexing=true`, monitor off |
 | Load generator | `pgbench` from the `postgres:18` image (`docker run`, one container per cell) | |
 | Metrics | Prometheus, postgres_exporter, sql_exporter, pgbouncer_exporter, ProxySQL built-in `/metrics` (REST API :6070), cAdvisor, Pushgateway | |
 | Dashboards | Grafana, provisioned from `docker/grafana/gen_dashboards.py` | |
