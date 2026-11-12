@@ -1,0 +1,12 @@
+# Reused from ../fillfactor: per-table stats / buffercache for the `bench` database.
+global:
+  scrape_timeout: 10s
+  min_interval: 10s
+jobs:
+  - job_name: database
+    collectors: [database]
+    static_configs:
+      - targets:
+          bench: 'postgresql://postgres:postgres@postgres:5432/bench?sslmode=disable'
+
+collector_files: ['postgres_database.yml']
